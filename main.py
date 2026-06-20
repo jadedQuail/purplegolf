@@ -9,6 +9,10 @@ ASSET_EXTENSION = ".glb"
 # Top of the green in every kit tile (local z)
 GREEN_SURFACE_Z = 0.0633
 
+# Club orientation constants
+CLUB_LIE_TILT = 13.7
+CLUB_HEAD_OFFSET_X = -0.18
+
 # Asset model names (files under ASSET_DIRECTORY)
 TILE_START = "start"
 TILE_STRAIGHT = "straight"
@@ -76,11 +80,12 @@ class MinigolfApp(ShowBase):
         club.reparentTo(parent)
 
         # Rotate face to look down the course
-        club.setH(90)
+        club.setH(270)
+        club.setP(CLUB_LIE_TILT)
 
         # Place club head on the green
         club_min, _ = club.getTightBounds()
-        club.setPos(-0.15, 0.0, GREEN_SURFACE_Z - club_min.z)
+        club.setPos(CLUB_HEAD_OFFSET_X, 0, GREEN_SURFACE_Z - club_min.z)
 
         self.club = club
         return club
