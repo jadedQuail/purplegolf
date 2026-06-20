@@ -1,3 +1,4 @@
+from direct.interval.IntervalGlobal import LerpHprInterval, Sequence
 from direct.showbase.ShowBase import ShowBase
 
 from orbit_camera import OrbitCamera
@@ -12,6 +13,19 @@ GREEN_SURFACE_Z = 0.0633
 # Club orientation constants
 CLUB_LIE_TILT = 13.7
 CLUB_HEAD_OFFSET_X = -0.18
+CLUB_HEAD_OFFSET_Y = 0.025
+
+# Putt swing - pivot pitch in degrees, leg durations in seconds.
+# Signs are eyeball-tunable: if the backswing dips toward the ball instead of
+# lifting away from it, flip the two pitch signs.
+SWING_BACK_PITCH_DEGREES = -25
+SWING_THROUGH_PITCH_DEGREES = 25
+SWING_BACK_TIME_SECONDS = 0.4      # slower takeaway
+SWING_THROUGH_TIME_SECONDS = 0.25  # quicker strike
+SWING_RETURN_TIME_SECONDS = 0.3
+
+# Key that triggers a putt swing
+SWING_KEY = "space"
 
 # Asset model names (files under ASSET_DIRECTORY)
 TILE_START = "start"
@@ -43,6 +57,10 @@ class MinigolfApp(ShowBase):
 
         # Dev camera - so I can see the course more easily right now
         self.orbit_camera = OrbitCamera(self, self.course)
+
+        # Press space to take a putt swing
+        self.swing_sequence = None
+        self.accept(SWING_KEY, self.swing_club)
 
     def load_tile(self, parent, name, x, y, heading=0):
         """Load a tile by name and place it on the grid at (x, y)."""
@@ -85,7 +103,7 @@ class MinigolfApp(ShowBase):
 
         # Place club head on the green
         club_min, _ = club.getTightBounds()
-        club.setPos(CLUB_HEAD_OFFSET_X, 0, GREEN_SURFACE_Z - club_min.z)
+        club.setPos(CLUB_HEAD_OFFSET_X, CLUB_HEAD_OFFSET_Y, GREEN_SURFACE_Z - club_min.z)
 
         self.club_pivot = self.add_swing_pivot(club, parent)
         self.club = club
@@ -103,6 +121,19 @@ class MinigolfApp(ShowBase):
         )
         club.wrtReparentTo(pivot)
         return pivot
+
+    def swing_club(self):
+        """Play one putt stroke: back, through, then settle to rest."""
+        # Ignore re-presses while a stroke is already playing.
+        if self.swing_sequence is not None and self.swing_sequence.isPlaying():
+            return
+        pivot = self.club_pivot
+        self.swing_sequence = Sequence(
+            LerpHprInterval(pivot, SWING_BACK_TIME_SECONDS, (0, SWING_BACK_PITCH_DEGREES, 0)),
+            LerpHprInterval(pivot, SWING_THROUGH_TIME_SECONDS, (0, SWING_THROUGH_PITCH_DEGREES, 0)),
+            LerpHprInterval(pivot, SWING_RETURN_TIME_SECONDS, (0, 0, 0)),
+        )
+        self.swing_sequence.start()
 
 
 if __name__ == "__main__":
