@@ -4,6 +4,17 @@ from orbit_camera import OrbitCamera
 
 TILE_SIZE = 1.0
 ASSET_DIRECTORY = "kenney_minigolf-kit/GLB format"
+ASSET_EXTENSION = ".glb"
+
+# Asset model names (files under ASSET_DIRECTORY)
+TILE_START = "start"
+TILE_STRAIGHT = "straight"
+TILE_HOLE_ROUND = "hole-round"
+BALL_BLUE = "ball-blue"
+
+# Scene-graph node names
+COURSE_NODE = "course"
+TEE_SETUP_NODE = "tee_setup"
 
 
 class MinigolfApp(ShowBase):
@@ -13,12 +24,12 @@ class MinigolfApp(ShowBase):
         # No camera dragging
         self.disableMouse()
 
-        self.course = self.render.attachNewNode("course")
+        self.course = self.render.attachNewNode(COURSE_NODE)
 
         self.build_course(course=self.course)
 
         # Grouping for items at the tee
-        self.tee_setup = self.course.attachNewNode("tee_setup")
+        self.tee_setup = self.course.attachNewNode(TEE_SETUP_NODE)
         self.place_ball(parent=self.tee_setup)
 
         # Dev camera - so I can see the course more easily right now
@@ -26,7 +37,7 @@ class MinigolfApp(ShowBase):
 
     def load_tile(self, parent, name, x, y, heading=0):
         """Load a tile by name and place it on the grid at (x, y)."""
-        tile = self.loader.loadModel(f"{ASSET_DIRECTORY}/{name}.glb")
+        tile = self.loader.loadModel(f"{ASSET_DIRECTORY}/{name}{ASSET_EXTENSION}")
         tile.reparentTo(parent)
         tile.setPos(x * TILE_SIZE, y * TILE_SIZE, 0)
         tile.setH(heading)
@@ -34,15 +45,15 @@ class MinigolfApp(ShowBase):
 
     def build_course(self, course):
         """Tee off, run down a short fairway, into the hole."""
-        self.load_tile(parent=course, name="start", x=0, y=0)
-        self.load_tile(parent=course, name="straight", x=0, y=1)
-        self.load_tile(parent=course, name="straight", x=0, y=2)
-        self.load_tile(parent=course, name="straight", x=0, y=3)
-        self.load_tile(parent=course, name="hole-round", x=0, y=4, heading=180)
+        self.load_tile(parent=course, name=TILE_START, x=0, y=0)
+        self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=1)
+        self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=2)
+        self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=3)
+        self.load_tile(parent=course, name=TILE_HOLE_ROUND, x=0, y=4, heading=180)
 
     def place_ball(self, parent):
         """Seat the ball on the green, centered on the start tile."""
-        ball = self.loader.loadModel(f"{ASSET_DIRECTORY}/ball-blue.glb")
+        ball = self.loader.loadModel(f"{ASSET_DIRECTORY}/{BALL_BLUE}{ASSET_EXTENSION}")
         ball.reparentTo(parent)
 
         # Get top of course geometry
