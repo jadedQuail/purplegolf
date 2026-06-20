@@ -15,13 +15,11 @@ CLUB_LIE_TILT = 13.7
 CLUB_HEAD_OFFSET_X = -0.18
 CLUB_HEAD_OFFSET_Y = 0.025
 
-# Putt swing - pivot pitch in degrees, leg durations in seconds.
-# Signs are eyeball-tunable: if the backswing dips toward the ball instead of
-# lifting away from it, flip the two pitch signs.
+# Putt swing constants
 SWING_BACK_PITCH_DEGREES = -25
 SWING_THROUGH_PITCH_DEGREES = 25
-SWING_BACK_TIME_SECONDS = 0.4      # slower takeaway
-SWING_THROUGH_TIME_SECONDS = 0.25  # quicker strike
+SWING_BACK_TIME_SECONDS = 0.4
+SWING_THROUGH_TIME_SECONDS = 0.25
 SWING_RETURN_TIME_SECONDS = 0.3
 
 # Key that triggers a putt swing
