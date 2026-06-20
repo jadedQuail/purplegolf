@@ -1,4 +1,4 @@
-from direct.interval.IntervalGlobal import LerpHprInterval, Sequence
+from direct.interval.IntervalGlobal import Func, LerpHprInterval, Sequence
 from direct.showbase.ShowBase import ShowBase
 
 from orbit_camera import OrbitCamera
@@ -21,6 +21,10 @@ SWING_THROUGH_PITCH_DEGREES = 25
 SWING_BACK_TIME_SECONDS = 0.4
 SWING_THROUGH_TIME_SECONDS = 0.25
 SWING_RETURN_TIME_SECONDS = 0.3
+
+# Club is at address (touching the ball) when the pivot pitch is 0,
+# so the through-swing passes through contact at this pitch.
+SWING_CONTACT_PITCH_DEGREES = 0
 
 # Key that triggers a putt swing
 SWING_KEY = "space"
@@ -126,12 +130,22 @@ class MinigolfApp(ShowBase):
         if self.swing_sequence is not None and self.swing_sequence.isPlaying():
             return
         pivot = self.club_pivot
+
+        # Split swing so we can find the moment the club hits the ball (pitch = 0)
+        half_through_time = SWING_THROUGH_TIME_SECONDS / 2
+        
         self.swing_sequence = Sequence(
             LerpHprInterval(pivot, SWING_BACK_TIME_SECONDS, (0, SWING_BACK_PITCH_DEGREES, 0)),
-            LerpHprInterval(pivot, SWING_THROUGH_TIME_SECONDS, (0, SWING_THROUGH_PITCH_DEGREES, 0)),
+            LerpHprInterval(pivot, half_through_time, (0, SWING_CONTACT_PITCH_DEGREES, 0)),
+            Func(self.on_ball_contact),
+            LerpHprInterval(pivot, half_through_time, (0, SWING_THROUGH_PITCH_DEGREES, 0)),
             LerpHprInterval(pivot, SWING_RETURN_TIME_SECONDS, (0, 0, 0)),
         )
         self.swing_sequence.start()
+
+    def on_ball_contact(self):
+        """Club has reached the ball at address — the putt is struck here."""
+        print("[DIAG] contact")
 
 
 if __name__ == "__main__":
