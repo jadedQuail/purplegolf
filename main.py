@@ -1,9 +1,7 @@
 from direct.showbase.ShowBase import ShowBase
 
-# Kenney tiles sit on a 1x1 grid, so stepping position by 1.0 snaps them
-# edge-to-edge.
 TILE_SIZE = 1.0
-ASSET_DIR = "kenney_minigolf-kit/GLB format"
+ASSET_DIRECTORY = "kenney_minigolf-kit/GLB format"
 
 
 class MinigolfApp(ShowBase):
@@ -20,7 +18,7 @@ class MinigolfApp(ShowBase):
 
     def load_tile(self, parent, name, x, y, heading=0):
         """Load a tile by name and place it on the grid at (x, y)."""
-        tile = self.loader.loadModel(f"{ASSET_DIR}/{name}.glb")
+        tile = self.loader.loadModel(f"{ASSET_DIRECTORY}/{name}.glb")
         tile.reparentTo(parent)
         tile.setPos(x * TILE_SIZE, y * TILE_SIZE, 0)
         tile.setH(heading)
@@ -32,7 +30,7 @@ class MinigolfApp(ShowBase):
         self.load_tile(parent, "straight", 0, 1)
         self.load_tile(parent, "straight", 0, 2)
         self.load_tile(parent, "straight", 0, 3)
-        self.load_tile(parent, "hole-round", 0, 4)
+        self.load_tile(parent, "hole-round", 0, 4, heading=180)
 
     def frame_camera(self, node):
         """Point the camera at a node so its whole extent is visible."""
