@@ -6,6 +6,9 @@ TILE_SIZE = 1.0
 ASSET_DIRECTORY = "kenney_minigolf-kit/GLB format"
 ASSET_EXTENSION = ".glb"
 
+# Top of the green in every kit tile (local z)
+GREEN_SURFACE_Z = 0.0633
+
 # Asset model names (files under ASSET_DIRECTORY)
 TILE_START = "start"
 TILE_STRAIGHT = "straight"
@@ -56,15 +59,11 @@ class MinigolfApp(ShowBase):
         ball = self.loader.loadModel(f"{ASSET_DIRECTORY}/{BALL_BLUE}{ASSET_EXTENSION}")
         ball.reparentTo(parent)
 
-        # Get top of course geometry
-        _, course_max = self.course.getTightBounds()
-        surface_z = course_max.z
-
-        # Place ball on surface
+        # Place ball on green surface
         ball_min, _ = ball.getTightBounds()
-        ball.setPos(0, 0, surface_z - ball_min.z)
+        ball.setPos(0, 0.15, GREEN_SURFACE_Z - ball_min.z)
 
-        print("[DIAG] surface_z:", surface_z, "ball pos:", ball.getPos())
+        print("[DIAG] surface_z:", GREEN_SURFACE_Z, "ball pos:", ball.getPos())
 
         self.ball = ball
         return ball
