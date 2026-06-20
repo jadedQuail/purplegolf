@@ -1,5 +1,6 @@
 from direct.interval.IntervalGlobal import Func, LerpHprInterval, Sequence
 from direct.showbase.ShowBase import ShowBase
+from panda3d.bullet import BulletWorld
 
 from orbit_camera import OrbitCamera
 
@@ -26,6 +27,10 @@ SWING_RETURN_TIME_SECONDS = 0.3
 # so the through-swing passes through contact at this pitch.
 SWING_CONTACT_PITCH_DEGREES = 0
 
+# Physics
+GRAVITY = (0, 0, -9.81)
+PHYSICS_TASK_NAME = "step_physics"
+
 # Key that triggers a putt swing
 SWING_KEY = "space"
 
@@ -48,6 +53,8 @@ class MinigolfApp(ShowBase):
         # No camera dragging
         self.disableMouse()
 
+        self.setup_physics()
+
         self.course = self.render.attachNewNode(COURSE_NODE)
 
         self.build_course(course=self.course)
@@ -63,6 +70,18 @@ class MinigolfApp(ShowBase):
         # Press space to take a putt swing
         self.swing_sequence = None
         self.accept(SWING_KEY, self.swing_club)
+
+    def setup_physics(self):
+        """Stand up the Bullet world and step it every frame (no bodies yet)."""
+        self.physics_world = BulletWorld()
+        self.physics_world.setGravity(GRAVITY)
+        self.taskMgr.add(self.step_physics, PHYSICS_TASK_NAME)
+
+    def step_physics(self, task):
+        """Advance the simulation by the time elapsed since the last frame."""
+        dt = self.clock.getDt()
+        self.physics_world.doPhysics(dt)
+        return task.cont
 
     def load_tile(self, parent, name, x, y, heading=0):
         """Load a tile by name and place it on the grid at (x, y)."""
