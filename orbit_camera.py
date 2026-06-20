@@ -2,7 +2,7 @@ from math import cos, radians, sin
 
 
 class OrbitCamera:
-    """Dev camera: left-drag to orbit a target node, mouse wheel to zoom.
+    """Dev camera: left-drag to orbit, middle-drag to pan, mouse wheel to zoom.
 
     This is an inspection tool; the real gameplay camera comes later. Construct
     it with the running ShowBase and the node to orbit around:
@@ -19,11 +19,17 @@ class OrbitCamera:
         self.yaw = 0.0
         self.pitch = 30.0
         self.dragging = False
+        self.panning = False
         self.last_mouse = None
 
-        # Drag to orbit, wheel to zoom.
+        # Let the view get in close without near-plane clipping (default is 1.0).
+        base.camLens.setNear(0.05)
+
+        # Left-drag to orbit, middle-drag to pan, wheel to zoom.
         base.accept("mouse1", self._set_dragging, [True])
         base.accept("mouse1-up", self._set_dragging, [False])
+        base.accept("mouse2", self._set_panning, [True])
+        base.accept("mouse2-up", self._set_panning, [False])
         base.accept("wheel_up", self._zoom, [0.9])
         base.accept("wheel_down", self._zoom, [1.1])
 
@@ -34,23 +40,42 @@ class OrbitCamera:
         if not dragging:
             self.last_mouse = None
 
+    def _set_panning(self, panning):
+        self.panning = panning
+        if not panning:
+            self.last_mouse = None
+
     def _zoom(self, factor):
         self.distance *= factor
 
     def _update(self, task):
         mouse = self.base.mouseWatcherNode
 
-        # While dragging, turn mouse movement into yaw/pitch changes.
-        if self.dragging and mouse.hasMouse():
+        # While dragging, turn mouse movement into an orbit (mouse1) or pan (mouse2).
+        if (self.dragging or self.panning) and mouse.hasMouse():
             x = mouse.getMouseX()  # normalized -1..1
             y = mouse.getMouseY()
             if self.last_mouse is not None:
                 dx = x - self.last_mouse[0]
                 dy = y - self.last_mouse[1]
-                self.yaw -= dx * 180.0
-                # Subtract dy so dragging up tilts the view up (non-inverted).
-                # Clamp pitch so we never flip over the poles.
-                self.pitch = max(5.0, min(85.0, self.pitch - dy * 180.0))
+                if self.dragging:
+                    self.yaw -= dx * 180.0
+                    # Subtract dy so dragging up tilts the view up (non-inverted).
+                    # Clamp just short of straight up/down (the poles) so lookAt
+                    # never gimbal-flips, but allow going below the green.
+                    self.pitch = max(-85.0, min(85.0, self.pitch - dy * 180.0))
+                else:
+                    # Slide the target in the camera's own right/up plane, scaled
+                    # by distance so the pan speed feels the same at any zoom.
+                    # Move opposite the drag so the scene follows the cursor.
+                    quat = self.base.camera.getQuat(self.base.render)
+                    right = quat.getRight()
+                    up = quat.getUp()
+                    self.target = (
+                        self.target
+                        - right * (dx * self.distance)
+                        - up * (dy * self.distance)
+                    )
             self.last_mouse = (x, y)
 
         # Convert orbit angles + distance into a camera position around target.

@@ -14,6 +14,7 @@ TILE_START = "start"
 TILE_STRAIGHT = "straight"
 TILE_HOLE_ROUND = "hole-round"
 BALL_BLUE = "ball-blue"
+CLUB_BLUE = "club-blue"
 
 # Scene-graph node names
 COURSE_NODE = "course"
@@ -34,6 +35,7 @@ class MinigolfApp(ShowBase):
         # Grouping for items at the tee
         self.tee_setup = self.course.attachNewNode(TEE_SETUP_NODE)
         self.place_ball(parent=self.tee_setup)
+        self.place_club(parent=self.tee_setup)
 
         # Dev camera - so I can see the course more easily right now
         self.orbit_camera = OrbitCamera(self, self.course)
@@ -67,6 +69,21 @@ class MinigolfApp(ShowBase):
 
         self.ball = ball
         return ball
+
+    def place_club(self, parent):
+        """Rest the club on the green, head pointing down the lane (rough pass)."""
+        club = self.loader.loadModel(f"{ASSET_DIRECTORY}/{CLUB_BLUE}{ASSET_EXTENSION}")
+        club.reparentTo(parent)
+
+        # Rotate face to look down the course
+        club.setH(90)
+
+        # Place club head on the green
+        club_min, _ = club.getTightBounds()
+        club.setPos(-0.15, 0.0, GREEN_SURFACE_Z - club_min.z)
+
+        self.club = club
+        return club
 
 
 if __name__ == "__main__":
