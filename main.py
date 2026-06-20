@@ -1,57 +1,49 @@
-from math import cos, pi, sin
-
-from direct.actor.Actor import Actor
-from direct.gui.OnscreenText import OnscreenText
 from direct.showbase.ShowBase import ShowBase
-from direct.task import Task
-from panda3d.core import TextNode
+
+# Kenney tiles sit on a 1x1 grid, so stepping position by 1.0 snaps them
+# edge-to-edge.
+TILE_SIZE = 1.0
+ASSET_DIR = "kenney_minigolf-kit/GLB format"
 
 
-class HelloWorldApp(ShowBase):
+class MinigolfApp(ShowBase):
     def __init__(self):
         super().__init__()
 
-        # Let the orbit task drive the camera instead of the mouse.
+        # No camera dragging
         self.disableMouse()
 
-        # Grassy ground/environment.
-        self.environment = self.loader.loadModel("models/environment")
-        self.environment.reparentTo(self.render)
-        self.environment.setScale(0.25)
-        self.environment.setPos(-8, 42, 0)
+        self.course = self.render.attachNewNode("course")
 
-        # Animated panda walking in place.
-        self.panda = Actor(
-            "models/panda-model",
-            {"walk": "models/panda-walk4"},
-        )
-        self.panda.setScale(0.005)
-        self.panda.reparentTo(self.render)
-        self.panda.loop("walk")
+        self.build_course(self.course)
+        self.frame_camera(self.course)
 
-        # On-screen greeting.
-        self.title = OnscreenText(
-            text="Hello, World!",
-            pos=(0, -0.9),
-            scale=0.08,
-            fg=(1, 1, 1, 1),
-            shadow=(0, 0, 0, 1),
-            align=TextNode.ACenter,
-            mayChange=False,
-        )
+    def load_tile(self, parent, name, x, y, heading=0):
+        """Load a tile by name and place it on the grid at (x, y)."""
+        tile = self.loader.loadModel(f"{ASSET_DIR}/{name}.glb")
+        tile.reparentTo(parent)
+        tile.setPos(x * TILE_SIZE, y * TILE_SIZE, 0)
+        tile.setH(heading)
+        return tile
 
-        self.taskMgr.add(self.spin_camera_task, "SpinCameraTask")
+    def build_course(self, parent):
+        """Tee off, run down a short fairway, into the hole."""
+        self.load_tile(parent, "start", 0, 0)
+        self.load_tile(parent, "straight", 0, 1)
+        self.load_tile(parent, "straight", 0, 2)
+        self.load_tile(parent, "straight", 0, 3)
+        self.load_tile(parent, "hole-round", 0, 4)
 
-    def spin_camera_task(self, task):
-        """Orbit the camera around the origin, looking at the scene."""
-        # 6 degrees per second, frame-rate independent.
-        angle_radians = task.time * (6.0 * pi / 180.0) * 3.0
-        radius = 20.0
-        self.camera.setPos(radius * sin(angle_radians), -radius * cos(angle_radians), 3)
-        self.camera.lookAt(0, 0, 0)
-        return Task.cont
+    def frame_camera(self, node):
+        """Point the camera at a node so its whole extent is visible."""
+        min_pt, max_pt = node.getTightBounds()
+        center = (min_pt + max_pt) / 2
+        size = (max_pt - min_pt).length()
+
+        self.camera.setPos(center.x, min_pt.y - size * 0.8, center.z + size * 0.8)
+        self.camera.lookAt(center)
 
 
 if __name__ == "__main__":
-    app = HelloWorldApp()
+    app = MinigolfApp()
     app.run()
