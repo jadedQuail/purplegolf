@@ -87,8 +87,22 @@ class MinigolfApp(ShowBase):
         club_min, _ = club.getTightBounds()
         club.setPos(CLUB_HEAD_OFFSET_X, 0, GREEN_SURFACE_Z - club_min.z)
 
+        self.club_pivot = self.add_swing_pivot(club, parent)
         self.club = club
         return club
+
+    def add_swing_pivot(self, club, parent):
+        """Set the pivot point to the top of the club"""
+        club_min, club_max = club.getTightBounds(parent)
+        pivot = parent.attachNewNode("club_pivot")
+        # Pivot point set to top of club
+        pivot.setPos(
+            (club_min.x + club_max.x) / 2,
+            (club_min.y + club_max.y) / 2,
+            club_max.z,
+        )
+        club.wrtReparentTo(pivot)
+        return pivot
 
 
 if __name__ == "__main__":
