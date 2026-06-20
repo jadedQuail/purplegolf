@@ -1,5 +1,7 @@
 from direct.showbase.ShowBase import ShowBase
 
+from orbit_camera import OrbitCamera
+
 TILE_SIZE = 1.0
 ASSET_DIRECTORY = "kenney_minigolf-kit/GLB format"
 
@@ -19,7 +21,8 @@ class MinigolfApp(ShowBase):
         self.tee_setup = self.course.attachNewNode("tee_setup")
         self.place_ball(parent=self.tee_setup)
 
-        self.frame_camera(self.course)
+        # Dev camera - so I can see the course more easily right now
+        self.orbit_camera = OrbitCamera(self, self.course)
 
     def load_tile(self, parent, name, x, y, heading=0):
         """Load a tile by name and place it on the grid at (x, y)."""
@@ -54,15 +57,6 @@ class MinigolfApp(ShowBase):
 
         self.ball = ball
         return ball
-
-    def frame_camera(self, node):
-        """Point the camera at a node so its whole extent is visible."""
-        min_pt, max_pt = node.getTightBounds()
-        center = (min_pt + max_pt) / 2
-        size = (max_pt - min_pt).length()
-
-        self.camera.setPos(center.x, min_pt.y - size * 0.8, center.z + size * 0.8)
-        self.camera.lookAt(center)
 
 
 if __name__ == "__main__":
