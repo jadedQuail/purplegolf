@@ -219,3 +219,6 @@ __marimo__/
 
 # VS Code
 .vscode/
+
+# AI Files
+.claude/
