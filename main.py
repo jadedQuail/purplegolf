@@ -1,6 +1,11 @@
 from direct.interval.IntervalGlobal import Func, LerpHprInterval, Sequence
 from direct.showbase.ShowBase import ShowBase
-from panda3d.bullet import BulletWorld
+from panda3d.bullet import (
+    BulletPlaneShape,
+    BulletRigidBodyNode,
+    BulletWorld,
+)
+from panda3d.core import Vec3
 
 from orbit_camera import OrbitCamera
 
@@ -45,6 +50,9 @@ CLUB_BLUE = "club-blue"
 COURSE_NODE = "course"
 TEE_SETUP_NODE = "tee_setup"
 
+# Physics body names (used to identify bodies in collisions)
+GROUND_BODY = "ground"
+
 
 class MinigolfApp(ShowBase):
     def __init__(self):
@@ -58,6 +66,9 @@ class MinigolfApp(ShowBase):
         self.course = self.render.attachNewNode(COURSE_NODE)
 
         self.build_course(course=self.course)
+
+        # Static floor for physics bodies to land on
+        self.place_ground(parent=self.render)
 
         # Grouping for items at the tee
         self.tee_setup = self.course.attachNewNode(TEE_SETUP_NODE)
@@ -98,6 +109,18 @@ class MinigolfApp(ShowBase):
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=2)
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=3)
         self.load_tile(parent=course, name=TILE_HOLE_ROUND, x=0, y=4, heading=180)
+
+    def place_ground(self, parent):
+        """Physics floor for ball to land on"""
+
+        # Infinite plane
+        shape = BulletPlaneShape(Vec3(0, 0, 1), GREEN_SURFACE_Z)
+        body = BulletRigidBodyNode(GROUND_BODY)
+        body.addShape(shape)
+        parent.attachNewNode(body)
+        self.physics_world.attachRigidBody(body)
+        self.ground_body = body
+        return body
 
     def place_ball(self, parent):
         """Seat the ball on the green, centered on the start tile."""
