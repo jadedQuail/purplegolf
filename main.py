@@ -38,7 +38,8 @@ GRAVITY = (0, 0, -9.81)
 PHYSICS_TASK_NAME = "step_physics"
 
 BALL_MASS = 1.0
-BALL_DROP_HEIGHT = 0.5
+# Speed the ball is launched at on contact (world units/sec, down +y the course).
+PUTT_SPEED = 2.0
 
 # Key that triggers a putt swing
 SWING_KEY = "space"
@@ -143,8 +144,7 @@ class MinigolfApp(ShowBase):
         body.setMass(BALL_MASS)
 
         ball_nodepath = parent.attachNewNode(body)
-        # Ball center rests at surface + radius; the drop gap is temporary.
-        ball_nodepath.setPos(0, 0.15, GREEN_SURFACE_Z + radius + BALL_DROP_HEIGHT)
+        ball_nodepath.setPos(0, 0.15, GREEN_SURFACE_Z + radius)
 
         # Park the visual model under the body, centered on the body origin.
         ball.reparentTo(ball_nodepath)
@@ -208,8 +208,9 @@ class MinigolfApp(ShowBase):
         self.swing_sequence.start()
 
     def on_ball_contact(self):
-        """Club has reached the ball at address — the putt is struck here."""
-        print("[DIAG] contact")
+        """Club has reached the ball at address — launch the putt."""
+        self.ball_body.setLinearVelocity(Vec3(0, PUTT_SPEED, 0))
+        self.ball_body.setActive(True)
 
 
 if __name__ == "__main__":
