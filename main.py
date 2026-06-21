@@ -40,6 +40,10 @@ PHYSICS_TASK_NAME = "step_physics"
 BALL_MASS = 1.0
 # Speed the ball is launched at on contact (world units/sec, down +y the course).
 PUTT_SPEED = 2.0
+# Contact friction at the ball/green surface (combined from both bodies).
+SURFACE_FRICTION = 0.6
+# Bleeds energy from the rolling ball each frame so the putt decays to a stop.
+BALL_LINEAR_DAMPING = 0.5
 
 # Key that triggers a putt swing
 SWING_KEY = "space"
@@ -122,12 +126,13 @@ class MinigolfApp(ShowBase):
 
         # Infinite plane
         shape = BulletPlaneShape(Vec3(0, 0, 1), GREEN_SURFACE_Z)
-        body = BulletRigidBodyNode(GROUND_BODY)
-        body.addShape(shape)
-        parent.attachNewNode(body)
-        self.physics_world.attachRigidBody(body)
-        self.ground_body = body
-        return body
+        ground_body = BulletRigidBodyNode(GROUND_BODY)
+        ground_body.addShape(shape)
+        ground_body.setFriction(SURFACE_FRICTION)
+        parent.attachNewNode(ground_body)
+        self.physics_world.attachRigidBody(ground_body)
+        self.ground_body = ground_body
+        return ground_body
 
     def place_ball(self, parent):
         """Seat the ball on the green as a dynamic physics body."""
@@ -139,22 +144,24 @@ class MinigolfApp(ShowBase):
         center = (ball_min + ball_max) / 2
 
         shape = BulletSphereShape(radius)
-        body = BulletRigidBodyNode(BALL_BODY)
-        body.addShape(shape)
-        body.setMass(BALL_MASS)
+        ball_body = BulletRigidBodyNode(BALL_BODY)
+        ball_body.addShape(shape)
+        ball_body.setMass(BALL_MASS)
+        ball_body.setFriction(SURFACE_FRICTION)
+        ball_body.setLinearDamping(BALL_LINEAR_DAMPING)
 
-        ball_nodepath = parent.attachNewNode(body)
+        ball_nodepath = parent.attachNewNode(ball_body)
         ball_nodepath.setPos(0, 0.15, GREEN_SURFACE_Z + radius)
 
         # Park the visual model under the body, centered on the body origin.
         ball.reparentTo(ball_nodepath)
         ball.setPos(-center)
 
-        self.physics_world.attachRigidBody(body)
+        self.physics_world.attachRigidBody(ball_body)
 
         # Save variables
         self.ball = ball
-        self.ball_body = body
+        self.ball_body = ball_body
         self.ball_nodepath = ball_nodepath
         return ball
 
