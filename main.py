@@ -38,12 +38,10 @@ GRAVITY = (0, 0, -9.81)
 PHYSICS_TASK_NAME = "step_physics"
 
 BALL_MASS = 1.0
-# Speed the ball is launched at on contact (world units/sec, down +y the course).
 PUTT_SPEED = 2.0
-# Contact friction at the ball/green surface (combined from both bodies).
 SURFACE_FRICTION = 0.6
-# Bleeds energy from the rolling ball each frame so the putt decays to a stop.
-BALL_LINEAR_DAMPING = 0.5
+ROLLING_RESISTANCE_CONSTANT = 0.12
+ROLLING_DRAG = 0.7
 
 # Key that triggers a putt swing
 SWING_KEY = "space"
@@ -103,7 +101,31 @@ class MinigolfApp(ShowBase):
         """Advance the simulation by the time elapsed since the last frame."""
         dt = self.clock.getDt()
         self.physics_world.doPhysics(dt)
+        self.apply_rolling_resistance(dt)
         return task.cont
+
+    def apply_rolling_resistance(self, dt):
+        """Shave a constant amount of speed each frame"""
+        if not self.ball_body.isActive():
+            return
+
+        velocity = self.ball_body.getLinearVelocity()
+        speed = Vec3(velocity.x, velocity.y, 0).length()
+        if speed == 0:
+            return
+
+        decrement = (ROLLING_RESISTANCE_CONSTANT + ROLLING_DRAG * speed) * dt
+        if decrement >= speed:
+            # Next step would cross zero -> settle to a full stop at near-zero speed.
+            self.ball_body.setLinearVelocity(Vec3(0, 0, 0))
+            self.ball_body.setAngularVelocity(Vec3(0, 0, 0))
+            self.ball_body.setActive(False)
+            return
+
+        # Scale linear and spin together so the ball keeps rolling consistently
+        scale = (speed - decrement) / speed
+        self.ball_body.setLinearVelocity(Vec3(velocity.x * scale, velocity.y * scale, velocity.z))
+        self.ball_body.setAngularVelocity(self.ball_body.getAngularVelocity() * scale)
 
     def load_tile(self, parent, name, x, y, heading=0):
         """Load a tile by name and place it on the grid at (x, y)."""
@@ -148,7 +170,6 @@ class MinigolfApp(ShowBase):
         ball_body.addShape(shape)
         ball_body.setMass(BALL_MASS)
         ball_body.setFriction(SURFACE_FRICTION)
-        ball_body.setLinearDamping(BALL_LINEAR_DAMPING)
 
         ball_nodepath = parent.attachNewNode(ball_body)
         ball_nodepath.setPos(0, 0.15, GREEN_SURFACE_Z + radius)
