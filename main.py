@@ -5,6 +5,8 @@ from panda3d.bullet import (
     BulletPlaneShape,
     BulletRigidBodyNode,
     BulletSphereShape,
+    BulletTriangleMesh,
+    BulletTriangleMeshShape,
     BulletWorld,
 )
 from panda3d.core import Vec3
@@ -62,6 +64,7 @@ PHYSICS_DEBUG_NODE = "physics_debug"
 # Physics body names (used to identify bodies in collisions)
 GROUND_BODY = "ground"
 BALL_BODY = "ball"
+TILE_BODY = "tile"
 
 
 class MinigolfApp(ShowBase):
@@ -149,9 +152,30 @@ class MinigolfApp(ShowBase):
         tile.setH(heading)
         return tile
 
+    def make_tile_collider(self, model):
+        """Build a static collider that traces a tile's mesh"""
+        mesh = BulletTriangleMesh()
+        for geom_nodepath in model.findAllMatches("**/+GeomNode"):
+            geom_node = geom_nodepath.node()
+            # Keep each piece's placement relative to the tile root.
+            transform = geom_nodepath.getTransform(model)
+            for i in range(geom_node.getNumGeoms()):
+                mesh.addGeom(geom_node.getGeom(i), True, transform)
+
+        shape = BulletTriangleMeshShape(mesh, dynamic=False)
+        tile_body = BulletRigidBodyNode(TILE_BODY)
+        tile_body.addShape(shape)
+        tile_body.setFriction(SURFACE_FRICTION)
+
+        collider_nodepath = model.attachNewNode(tile_body)
+        self.physics_world.attachRigidBody(tile_body)
+        return collider_nodepath
+
     def build_course(self, course):
         """Tee off, run down a short fairway, into the hole."""
-        self.load_tile(parent=course, name=TILE_START, x=0, y=0)
+        start_tile = self.load_tile(parent=course, name=TILE_START, x=0, y=0)
+        # Step 2: collider on just this one tile so we can eyeball the wireframe.
+        self.make_tile_collider(start_tile)
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=1)
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=2)
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=3)
