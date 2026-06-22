@@ -1,6 +1,7 @@
 from direct.interval.IntervalGlobal import Func, LerpHprInterval, Sequence
 from direct.showbase.ShowBase import ShowBase
 from panda3d.bullet import (
+    BulletDebugNode,
     BulletPlaneShape,
     BulletRigidBodyNode,
     BulletSphereShape,
@@ -56,6 +57,7 @@ CLUB_BLUE = "club-blue"
 # Scene-graph node names
 COURSE_NODE = "course"
 TEE_SETUP_NODE = "tee_setup"
+PHYSICS_DEBUG_NODE = "physics_debug"
 
 # Physics body names (used to identify bodies in collisions)
 GROUND_BODY = "ground"
@@ -96,6 +98,18 @@ class MinigolfApp(ShowBase):
         self.physics_world = BulletWorld()
         self.physics_world.setGravity(GRAVITY)
         self.taskMgr.add(self.step_physics, PHYSICS_TASK_NAME)
+        self.setup_physics_debug()
+
+    def setup_physics_debug(self):
+        """Draw every collider in the world as wireframe, overlaid on the models."""
+        debug_node = BulletDebugNode(PHYSICS_DEBUG_NODE)
+        debug_node.showWireframe(True)
+
+        debug_nodepath = self.render.attachNewNode(debug_node)
+        debug_nodepath.show()
+
+        self.physics_world.setDebugNode(debug_node)
+        self.physics_debug_nodepath = debug_nodepath
 
     def step_physics(self, task):
         """Advance the simulation by the time elapsed since the last frame."""
