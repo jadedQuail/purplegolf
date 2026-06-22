@@ -2,7 +2,6 @@ from direct.interval.IntervalGlobal import Func, LerpHprInterval, Sequence
 from direct.showbase.ShowBase import ShowBase
 from panda3d.bullet import (
     BulletDebugNode,
-    BulletPlaneShape,
     BulletRigidBodyNode,
     BulletSphereShape,
     BulletTriangleMesh,
@@ -62,7 +61,6 @@ TEE_SETUP_NODE = "tee_setup"
 PHYSICS_DEBUG_NODE = "physics_debug"
 
 # Physics body names (used to identify bodies in collisions)
-GROUND_BODY = "ground"
 BALL_BODY = "ball"
 TILE_BODY = "tile"
 
@@ -79,9 +77,6 @@ class MinigolfApp(ShowBase):
         self.course = self.render.attachNewNode(COURSE_NODE)
 
         self.build_course(course=self.course)
-
-        # Static floor for physics bodies to land on
-        self.place_ground(parent=self.render)
 
         # Grouping for items at the tee
         self.tee_setup = self.course.attachNewNode(TEE_SETUP_NODE)
@@ -145,11 +140,12 @@ class MinigolfApp(ShowBase):
         self.ball_body.setAngularVelocity(self.ball_body.getAngularVelocity() * scale)
 
     def load_tile(self, parent, name, x, y, heading=0):
-        """Load a tile by name and place it on the grid at (x, y)."""
+        """Load a tile by name, place it on the grid at (x, y), and collider it."""
         tile = self.loader.loadModel(f"{ASSET_DIRECTORY}/{name}{ASSET_EXTENSION}")
         tile.reparentTo(parent)
         tile.setPos(x * TILE_SIZE, y * TILE_SIZE, 0)
         tile.setH(heading)
+        self.make_tile_collider(tile)
         return tile
 
     def make_tile_collider(self, model):
@@ -173,26 +169,11 @@ class MinigolfApp(ShowBase):
 
     def build_course(self, course):
         """Tee off, run down a short fairway, into the hole."""
-        start_tile = self.load_tile(parent=course, name=TILE_START, x=0, y=0)
-        # Step 2: collider on just this one tile so we can eyeball the wireframe.
-        self.make_tile_collider(start_tile)
+        self.load_tile(parent=course, name=TILE_START, x=0, y=0)
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=1)
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=2)
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=3)
         self.load_tile(parent=course, name=TILE_HOLE_ROUND, x=0, y=4, heading=180)
-
-    def place_ground(self, parent):
-        """Physics floor for ball to land on"""
-
-        # Infinite plane
-        shape = BulletPlaneShape(Vec3(0, 0, 1), GREEN_SURFACE_Z)
-        ground_body = BulletRigidBodyNode(GROUND_BODY)
-        ground_body.addShape(shape)
-        ground_body.setFriction(SURFACE_FRICTION)
-        parent.attachNewNode(ground_body)
-        self.physics_world.attachRigidBody(ground_body)
-        self.ground_body = ground_body
-        return ground_body
 
     def place_ball(self, parent):
         """Seat the ball on the green as a dynamic physics body."""
