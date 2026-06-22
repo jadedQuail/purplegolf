@@ -42,6 +42,8 @@ PHYSICS_TASK_NAME = "step_physics"
 BALL_MASS = 1.0
 PUTT_SPEED = 2.0
 SURFACE_FRICTION = 0.6
+# Bounciness
+SURFACE_RESTITUTION = 0.8
 ROLLING_RESISTANCE_CONSTANT = 0.12
 ROLLING_DRAG = 0.7
 
@@ -162,6 +164,7 @@ class MinigolfApp(ShowBase):
         tile_body = BulletRigidBodyNode(TILE_BODY)
         tile_body.addShape(shape)
         tile_body.setFriction(SURFACE_FRICTION)
+        tile_body.setRestitution(SURFACE_RESTITUTION)
 
         collider_nodepath = model.attachNewNode(tile_body)
         self.physics_world.attachRigidBody(tile_body)
@@ -189,6 +192,7 @@ class MinigolfApp(ShowBase):
         ball_body.addShape(shape)
         ball_body.setMass(BALL_MASS)
         ball_body.setFriction(SURFACE_FRICTION)
+        ball_body.setRestitution(SURFACE_RESTITUTION)
 
         ball_nodepath = parent.attachNewNode(ball_body)
         ball_nodepath.setPos(0, 0.15, GREEN_SURFACE_Z + radius)
