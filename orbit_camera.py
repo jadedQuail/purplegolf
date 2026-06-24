@@ -10,17 +10,16 @@ class OrbitCamera:
         self.orbit_camera = OrbitCamera(self, self.course)
     """
 
-    def __init__(self, base, target_node):
+    def __init__(self, base, target_node, enabled=True):
         self.base = base
+        self.target_node = target_node
 
-        min_pt, max_pt = target_node.getTightBounds()
-        self.target = (min_pt + max_pt) / 2
-        self.distance = (max_pt - min_pt).length()
-        self.yaw = 0.0
-        self.pitch = 30.0
         self.dragging = False
         self.panning = False
         self.last_mouse = None
+        self.enabled = enabled
+        # Frame the target from the default angle/distance.
+        self.reset()
 
         # Let the view get in close without near-plane clipping (default is 1.0).
         base.camLens.setNear(0.05)
@@ -34,6 +33,22 @@ class OrbitCamera:
         base.accept("wheel_down", self._zoom, [1.1])
 
         base.taskMgr.add(self._update, "orbit_camera")
+
+    def reset(self):
+        """Snap the orbit back to its default framing of the target."""
+        min_pt, max_pt = self.target_node.getTightBounds()
+        self.target = (min_pt + max_pt) / 2
+        self.distance = (max_pt - min_pt).length()
+        self.yaw = 0.0
+        self.pitch = 30.0
+
+    def enable(self):
+        self.reset()
+        self.enabled = True
+
+    def disable(self):
+        self.enabled = False
+        self.last_mouse = None
 
     def _set_dragging(self, dragging):
         self.dragging = dragging
@@ -49,6 +64,9 @@ class OrbitCamera:
         self.distance *= factor
 
     def _update(self, task):
+        if not self.enabled:
+            return task.cont
+
         mouse = self.base.mouseWatcherNode
 
         # While dragging, turn mouse movement into an orbit (mouse1) or pan (mouse2).

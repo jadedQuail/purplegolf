@@ -49,6 +49,12 @@ ROLLING_DRAG = 0.7
 
 # Key that triggers a putt swing
 SWING_KEY = "space"
+TOGGLE_CAMERA_KEY = "c"
+
+# Gameplay camera placement, relative to the ball
+CAMERA_BACK_DISTANCE = 5.0
+CAMERA_HEIGHT = 3.5
+GAME_CAMERA_TASK_NAME = "update_game_camera"
 
 # Asset model names (files under ASSET_DIRECTORY)
 TILE_START = "start"
@@ -86,8 +92,9 @@ class MinigolfApp(ShowBase):
         self.place_ball(parent=self.render)
         self.place_club(parent=self.tee_setup)
 
-        # Dev camera - so I can see the course more easily right now
-        self.orbit_camera = OrbitCamera(self, self.course)
+        self.orbit_camera = OrbitCamera(self, self.course, enabled=False)
+        self.setup_game_camera()
+        self.accept(TOGGLE_CAMERA_KEY, self.toggle_camera)
 
         # Press space to take a putt swing
         self.swing_sequence = None
@@ -140,6 +147,37 @@ class MinigolfApp(ShowBase):
         scale = (speed - decrement) / speed
         self.ball_body.setLinearVelocity(Vec3(velocity.x * scale, velocity.y * scale, velocity.z))
         self.ball_body.setAngularVelocity(self.ball_body.getAngularVelocity() * scale)
+
+    def setup_game_camera(self):
+        """Default gameplay view: parked behind and above the ball, aimed at it."""
+        self.game_camera_active = True
+        self.position_game_camera()
+        self.taskMgr.add(self.update_game_camera, GAME_CAMERA_TASK_NAME)
+
+    def position_game_camera(self):
+        """Drop the camera behind and above the ball."""
+        ball_pos = self.ball_nodepath.getPos(self.render)
+        self.camera.setPos(
+            ball_pos.x,
+            ball_pos.y - CAMERA_BACK_DISTANCE,
+            ball_pos.z + CAMERA_HEIGHT,
+        )
+        self.camera.lookAt(self.ball_nodepath)
+
+    def update_game_camera(self, task):
+        """Keep the parked camera aimed at the ball."""
+        if self.game_camera_active:
+            self.camera.lookAt(self.ball_nodepath)
+        return task.cont
+
+    def toggle_camera(self):
+        """Swap between the gameplay camera (default) and the orbit dev camera."""
+        self.game_camera_active = not self.game_camera_active
+        if self.game_camera_active:
+            self.orbit_camera.disable()
+            self.position_game_camera()
+        else:
+            self.orbit_camera.enable()
 
     def load_tile(self, parent, name, x, y, heading=0):
         """Load a tile by name, place it on the grid at (x, y), and collider it."""
