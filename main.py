@@ -165,8 +165,12 @@ class MinigolfApp(ShowBase):
         self.camera.lookAt(self.ball_nodepath)
 
     def update_game_camera(self, task):
-        """Keep the parked camera aimed at the ball."""
+        """Track the ball down the course, aimed at it the whole way."""
         if self.game_camera_active:
+            ball_pos = self.ball_nodepath.getPos(self.render)
+            cam_pos = self.camera.getPos(self.render)
+
+            self.camera.setPos(cam_pos.x, ball_pos.y - CAMERA_BACK_DISTANCE, cam_pos.z)
             self.camera.lookAt(self.ball_nodepath)
         return task.cont
 
