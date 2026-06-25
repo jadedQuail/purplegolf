@@ -8,7 +8,7 @@ from panda3d.bullet import (
     BulletTriangleMeshShape,
     BulletWorld,
 )
-from panda3d.core import Vec3
+from panda3d.core import Point3, Vec3
 
 from orbit_camera import OrbitCamera
 
@@ -92,15 +92,19 @@ class MinigolfApp(ShowBase):
         # Ball is a world-space physics body, not part of the static tee group
         self.place_ball(parent=self.render)
         self.place_club(parent=self.tee_setup)
+        self.setup_club_anchor()
 
         self.orbit_camera = OrbitCamera(self, self.course, enabled=False)
         self.setup_game_camera()
-        self.accept(TOGGLE_CAMERA_KEY, self.toggle_camera)
 
         # Press space to take a putt swing
         self.swing_sequence = None
+        
         # Camera-to-ball offset captured at contact, used to trail the ball while it rolls
         self.camera_follow_offset = Vec3(0, 0, 0)
+
+        # Keys
+        self.accept(TOGGLE_CAMERA_KEY, self.toggle_camera)
         self.accept(SWING_KEY, self.swing_club)
 
     def setup_physics(self):
@@ -144,16 +148,19 @@ class MinigolfApp(ShowBase):
             self.ball_body.setLinearVelocity(Vec3(0, 0, 0))
             self.ball_body.setAngularVelocity(Vec3(0, 0, 0))
             self.ball_body.setActive(False)
-
-            # Ball is at rest; move camera into position
-            if self.game_camera_active:
-                self.position_game_camera()
+            self.set_up_next_shot()
             return
 
         # Scale linear and spin together so the ball keeps rolling consistently
         scale = (speed - decrement) / speed
         self.ball_body.setLinearVelocity(Vec3(velocity.x * scale, velocity.y * scale, velocity.z))
         self.ball_body.setAngularVelocity(self.ball_body.getAngularVelocity() * scale)
+
+    def set_up_next_shot(self):
+        """Positions camera and club to be ready for next shot."""
+        self.position_club_behind_ball()
+        if self.game_camera_active:
+            self.position_game_camera()
 
     def setup_game_camera(self):
         """Default gameplay view: parked behind and above the ball, aimed at it."""
@@ -306,6 +313,21 @@ class MinigolfApp(ShowBase):
         )
         club.wrtReparentTo(pivot)
         return pivot
+
+    def setup_club_anchor(self):
+        """Create an anchor point behind the ball, parent the club pivot to it"""
+        self.club_anchor = self.render.attachNewNode("club_anchor")
+
+        self.position_club_behind_ball()
+        self.club_pivot.wrtReparentTo(self.club_anchor)
+
+    def position_club_behind_ball(self):
+        """Place the club behind the ball, aim it down to the hole"""
+        ball_pos = self.ball_nodepath.getPos(self.render)
+        hole_pos = self.hole_nodepath.getPos(self.render)
+
+        self.club_anchor.setPos(ball_pos)
+        self.club_anchor.lookAt(self.render, Point3(hole_pos.x, hole_pos.y, ball_pos.z))
 
     def swing_in_progress(self):
         """True while the club is mid-stroke."""
