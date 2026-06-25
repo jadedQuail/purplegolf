@@ -168,15 +168,17 @@ class MinigolfApp(ShowBase):
         self.position_game_camera()
         self.taskMgr.add(self.update_game_camera, GAME_CAMERA_TASK_NAME)
 
-    def position_game_camera(self):
-        ball_pos = self.ball_nodepath.getPos(self.render)
-        hole_pos = self.hole_nodepath.getPos(self.render)
-
-        # Horizontal direction from the ball to the hole
-        to_hole = hole_pos - ball_pos
+    def ball_to_hole_direction(self):
+        """Unit vector from the ball to the hole, flattened to the horizontal plane."""
+        to_hole = self.hole_nodepath.getPos(self.render) - self.ball_nodepath.getPos(self.render)
         to_hole.z = 0
         if to_hole.length() > 0:
             to_hole.normalize()
+        return to_hole
+
+    def position_game_camera(self):
+        ball_pos = self.ball_nodepath.getPos(self.render)
+        to_hole = self.ball_to_hole_direction()
 
         # Sit CAMERA_BACK_DISTANCE behind the ball, opposite the hole
         self.camera.setPos(
@@ -359,7 +361,8 @@ class MinigolfApp(ShowBase):
         ball_pos = self.ball_nodepath.getPos(self.render)
         self.camera_follow_offset = self.camera.getPos(self.render) - ball_pos
 
-        self.ball_body.setLinearVelocity(Vec3(0, PUTT_SPEED, 0))
+        # Launch the ball straight at the hole
+        self.ball_body.setLinearVelocity(self.ball_to_hole_direction() * PUTT_SPEED)
         self.ball_body.setActive(True)
 
 
