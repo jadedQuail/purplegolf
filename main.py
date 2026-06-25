@@ -67,6 +67,7 @@ CLUB_BLUE = "club-blue"
 COURSE_NODE = "course"
 TEE_SETUP_NODE = "tee_setup"
 PHYSICS_DEBUG_NODE = "physics_debug"
+HOLE_NODE = "hole"
 
 # Physics body names (used to identify bodies in collisions)
 BALL_BODY = "ball"
@@ -218,7 +219,18 @@ class MinigolfApp(ShowBase):
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=1)
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=2)
         self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=3)
-        self.load_tile(parent=course, name=TILE_HOLE_ROUND, x=0, y=4, heading=180)
+
+        hole_tile = self.load_tile(parent=course, name=TILE_HOLE_ROUND, x=0, y=4, heading=180)
+        self.place_hole(parent=hole_tile)
+
+    def place_hole(self, parent):
+        """Mark the cup so we can aim shots and the camera at it later."""
+        hole = parent.attachNewNode(HOLE_NODE)
+
+        # Cup sits at the center of the hole tile, on the green surface
+        hole.setPos(0, 0, GREEN_SURFACE_Z)
+        self.hole_nodepath = hole
+        return hole
 
     def place_ball(self, parent):
         """Seat the ball on the green as a dynamic physics body."""
@@ -244,6 +256,8 @@ class MinigolfApp(ShowBase):
         ball.setPos(-center)
 
         self.physics_world.attachRigidBody(ball_body)
+
+        ball_body.setActive(False)
 
         # Save variables
         self.ball = ball
@@ -281,11 +295,16 @@ class MinigolfApp(ShowBase):
         club.wrtReparentTo(pivot)
         return pivot
 
+    def swing_in_progress(self):
+        """True while the club is mid-stroke."""
+        return self.swing_sequence is not None and self.swing_sequence.isPlaying()
+
     def swing_club(self):
         """Play one putt stroke: back, through, then settle to rest."""
-        # Ignore re-presses while a stroke is already playing.
-        if self.swing_sequence is not None and self.swing_sequence.isPlaying():
+        # Block a new putt while the club is still swinging or the ball is still rolling
+        if self.swing_in_progress() or self.ball_body.isActive():
             return
+
         pivot = self.club_pivot
 
         # Split swing so we can find the moment the club hits the ball (pitch = 0)
