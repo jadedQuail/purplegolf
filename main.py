@@ -99,6 +99,8 @@ class MinigolfApp(ShowBase):
 
         # Press space to take a putt swing
         self.swing_sequence = None
+        # Camera-to-ball offset captured at contact, used to trail the ball while it rolls
+        self.camera_follow_offset = Vec3(0, 0, 0)
         self.accept(SWING_KEY, self.swing_club)
 
     def setup_physics(self):
@@ -142,6 +144,10 @@ class MinigolfApp(ShowBase):
             self.ball_body.setLinearVelocity(Vec3(0, 0, 0))
             self.ball_body.setAngularVelocity(Vec3(0, 0, 0))
             self.ball_body.setActive(False)
+
+            # Ball is at rest; move camera into position
+            if self.game_camera_active:
+                self.position_game_camera()
             return
 
         # Scale linear and spin together so the ball keeps rolling consistently
@@ -156,22 +162,28 @@ class MinigolfApp(ShowBase):
         self.taskMgr.add(self.update_game_camera, GAME_CAMERA_TASK_NAME)
 
     def position_game_camera(self):
-        """Drop the camera behind and above the ball."""
         ball_pos = self.ball_nodepath.getPos(self.render)
+        hole_pos = self.hole_nodepath.getPos(self.render)
+
+        # Horizontal direction from the ball to the hole
+        to_hole = hole_pos - ball_pos
+        to_hole.z = 0
+        if to_hole.length() > 0:
+            to_hole.normalize()
+
+        # Sit CAMERA_BACK_DISTANCE behind the ball, opposite the hole
         self.camera.setPos(
-            ball_pos.x,
-            ball_pos.y - CAMERA_BACK_DISTANCE,
+            ball_pos.x - to_hole.x * CAMERA_BACK_DISTANCE,
+            ball_pos.y - to_hole.y * CAMERA_BACK_DISTANCE,
             ball_pos.z + CAMERA_HEIGHT,
         )
         self.camera.lookAt(self.ball_nodepath)
 
     def update_game_camera(self, task):
-        """Track the ball down the course, aimed at it the whole way."""
-        if self.game_camera_active:
+        """Trail the ball while it rolls, holding the framing from the putt."""
+        if self.game_camera_active and self.ball_body.isActive():
             ball_pos = self.ball_nodepath.getPos(self.render)
-            cam_pos = self.camera.getPos(self.render)
-
-            self.camera.setPos(cam_pos.x, ball_pos.y - CAMERA_BACK_DISTANCE, cam_pos.z)
+            self.camera.setPos(ball_pos + self.camera_follow_offset)
             self.camera.lookAt(self.ball_nodepath)
         return task.cont
 
@@ -321,6 +333,10 @@ class MinigolfApp(ShowBase):
 
     def on_ball_contact(self):
         """Club has reached the ball at address — launch the putt."""
+        # Prevent camera from flipping its position pre-hit
+        ball_pos = self.ball_nodepath.getPos(self.render)
+        self.camera_follow_offset = self.camera.getPos(self.render) - ball_pos
+
         self.ball_body.setLinearVelocity(Vec3(0, PUTT_SPEED, 0))
         self.ball_body.setActive(True)
 
