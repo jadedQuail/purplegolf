@@ -1,10 +1,10 @@
 from direct.showbase.ShowBase import ShowBase
 from panda3d.bullet import BulletDebugNode, BulletWorld
-from panda3d.core import Vec3
 
 from ball import Ball
 from club import Club
 from course import Course
+from game_camera import GameCamera
 from orbit_camera import OrbitCamera
 from power_meter import PowerMeter
 
@@ -18,11 +18,6 @@ MAX_PUTT_SPEED = 5.0 # Ball speed at a full power bar; scaled down by fill perce
 SWING_KEY = "space"
 SWING_RELEASE_EVENT = f"{SWING_KEY}-up"
 TOGGLE_CAMERA_KEY = "c"
-
-# Gameplay camera placement, relative to the ball
-CAMERA_BACK_DISTANCE = 5.0
-CAMERA_HEIGHT = 3.5
-GAME_CAMERA_TASK_NAME = "update_game_camera"
 
 # Scene-graph node names
 PHYSICS_DEBUG_NODE = "physics_debug"
@@ -47,11 +42,9 @@ class MinigolfApp(ShowBase):
         self.club = Club(self, self.course.root, ball_pos, hole_pos)
 
         self.orbit_camera = OrbitCamera(self, self.course.root, enabled=False)
-        self.setup_game_camera()
+        self.game_camera = GameCamera(self, self.ball)
+        self.position_game_camera()
         self.power_meter = PowerMeter(self)
-
-        # Camera-to-ball offset captured at contact, used to trail the ball while it rolls
-        self.camera_follow_offset = Vec3(0, 0, 0)
 
         # Keys
         self.accept(TOGGLE_CAMERA_KEY, self.toggle_camera)
@@ -89,14 +82,8 @@ class MinigolfApp(ShowBase):
         ball_pos = self.ball.nodepath.getPos(self.render)
         hole_pos = self.course.hole.getPos(self.render)
         self.club.aim_behind(ball_pos, hole_pos)
-        if self.game_camera_active:
+        if self.game_camera.active:
             self.position_game_camera()
-
-    def setup_game_camera(self):
-        """Default gameplay view: parked behind and above the ball, aimed at it."""
-        self.game_camera_active = True
-        self.position_game_camera()
-        self.taskMgr.add(self.update_game_camera, GAME_CAMERA_TASK_NAME)
 
     def start_power_charge(self):
         """Begin charging the meter, unless a stroke or roll is in progress."""
@@ -113,29 +100,13 @@ class MinigolfApp(ShowBase):
         return to_hole
 
     def position_game_camera(self):
-        ball_pos = self.ball.nodepath.getPos(self.render)
-        to_hole = self.ball_to_hole_direction()
-
-        # Sit CAMERA_BACK_DISTANCE behind the ball, opposite the hole
-        self.camera.setPos(
-            ball_pos.x - to_hole.x * CAMERA_BACK_DISTANCE,
-            ball_pos.y - to_hole.y * CAMERA_BACK_DISTANCE,
-            ball_pos.z + CAMERA_HEIGHT,
-        )
-        self.camera.lookAt(self.ball.nodepath)
-
-    def update_game_camera(self, task):
-        """Trail the ball while it rolls, holding the framing from the putt."""
-        if self.game_camera_active and self.ball.is_rolling():
-            ball_pos = self.ball.nodepath.getPos(self.render)
-            self.camera.setPos(ball_pos + self.camera_follow_offset)
-            self.camera.lookAt(self.ball.nodepath)
-        return task.cont
+        """Frame the ball from behind, aimed down the line to the hole."""
+        self.game_camera.position_behind(self.ball_to_hole_direction())
 
     def toggle_camera(self):
         """Swap between the gameplay camera (default) and the orbit dev camera."""
-        self.game_camera_active = not self.game_camera_active
-        if self.game_camera_active:
+        self.game_camera.active = not self.game_camera.active
+        if self.game_camera.active:
             self.orbit_camera.disable()
             self.position_game_camera()
         else:
@@ -155,8 +126,7 @@ class MinigolfApp(ShowBase):
     def on_ball_contact(self):
         """Club has reached the ball at address — launch the putt."""
         # Prevent camera from flipping its position pre-hit
-        ball_pos = self.ball.nodepath.getPos(self.render)
-        self.camera_follow_offset = self.camera.getPos(self.render) - ball_pos
+        self.game_camera.capture_follow_offset()
 
         # Launch the ball straight at the hole, harder the fuller the power bar was
         launch_speed = MAX_PUTT_SPEED * self.power_meter.fraction()
