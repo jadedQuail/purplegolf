@@ -11,7 +11,18 @@ Requires **Python 3.12**.
 ### 1. Create the virtual environment
 
 ```powershell
+# PowerShell (Windows)
 python -m venv venv
+```
+
+```bash
+# Git Bash (Windows)
+python -m venv venv
+```
+
+```bash
+# macOS / Linux
+python3 -m venv venv
 ```
 
 ### 2. Activate it
@@ -24,8 +35,13 @@ Activate the venv at the start of every development session:
 ```
 
 ```bash
-# Git Bash
+# Git Bash (Windows)
 source venv/Scripts/activate
+```
+
+```bash
+# macOS / Linux
+source venv/bin/activate
 ```
 
 Once active, your shell prompt is prefixed with `(venv)`. To leave it, run
