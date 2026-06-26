@@ -3,22 +3,24 @@ from direct.showbase.ShowBase import ShowBase
 from panda3d.bullet import (
     BulletDebugNode,
     BulletRigidBodyNode,
-    BulletSphereShape,
     BulletTriangleMesh,
     BulletTriangleMeshShape,
     BulletWorld,
 )
 from panda3d.core import Point3, Vec3
 
+from ball import Ball
+from constants import (
+    ASSET_DIRECTORY,
+    ASSET_EXTENSION,
+    GREEN_SURFACE_Z,
+    SURFACE_FRICTION,
+    SURFACE_RESTITUTION,
+)
 from orbit_camera import OrbitCamera
 from power_meter import PowerMeter
 
 TILE_SIZE = 1.0
-ASSET_DIRECTORY = "kenney_minigolf-kit/GLB format"
-ASSET_EXTENSION = ".glb"
-
-# Top of the green in every kit tile (local z)
-GREEN_SURFACE_Z = 0.0633
 
 # Club orientation constants
 CLUB_LIE_TILT = 13.7
@@ -40,13 +42,7 @@ SWING_CONTACT_PITCH_DEGREES = 0
 GRAVITY = (0, 0, -9.81)
 PHYSICS_TASK_NAME = "step_physics"
 
-BALL_MASS = 1.0
 MAX_PUTT_SPEED = 5.0 # Ball speed at a full power bar; scaled down by fill percentage
-SURFACE_FRICTION = 0.6
-# Bounciness
-SURFACE_RESTITUTION = 0.8
-ROLLING_RESISTANCE_CONSTANT = 0.12
-ROLLING_DRAG = 0.7
 
 # Hold this key and release to take a putt swing
 SWING_KEY = "space"
@@ -62,7 +58,6 @@ GAME_CAMERA_TASK_NAME = "update_game_camera"
 TILE_START = "start"
 TILE_STRAIGHT = "straight"
 TILE_HOLE_ROUND = "hole-round"
-BALL_BLUE = "ball-blue"
 CLUB_BLUE = "club-blue"
 
 # Scene-graph node names
@@ -72,7 +67,6 @@ PHYSICS_DEBUG_NODE = "physics_debug"
 HOLE_NODE = "hole"
 
 # Physics body names (used to identify bodies in collisions)
-BALL_BODY = "ball"
 TILE_BODY = "tile"
 
 
@@ -92,7 +86,7 @@ class MinigolfApp(ShowBase):
         # Grouping for items at the tee
         self.tee_setup = self.course.attachNewNode(TEE_SETUP_NODE)
         # Ball is a world-space physics body, not part of the static tee group
-        self.place_ball(parent=self.render)
+        self.ball = Ball(self, self.render)
         self.place_club(parent=self.tee_setup)
         self.setup_club_anchor()
 
@@ -133,32 +127,9 @@ class MinigolfApp(ShowBase):
         """Advance the simulation by the time elapsed since the last frame."""
         dt = self.clock.getDt()
         self.physics_world.doPhysics(dt)
-        self.apply_rolling_resistance(dt)
-        return task.cont
-
-    def apply_rolling_resistance(self, dt):
-        """Shave a constant amount of speed each frame"""
-        if not self.ball_body.isActive():
-            return
-
-        velocity = self.ball_body.getLinearVelocity()
-        speed = Vec3(velocity.x, velocity.y, 0).length()
-        if speed == 0:
-            return
-
-        decrement = (ROLLING_RESISTANCE_CONSTANT + ROLLING_DRAG * speed) * dt
-        if decrement >= speed:
-            # Next step would cross zero -> settle to a full stop at near-zero speed.
-            self.ball_body.setLinearVelocity(Vec3(0, 0, 0))
-            self.ball_body.setAngularVelocity(Vec3(0, 0, 0))
-            self.ball_body.setActive(False)
+        if self.ball.apply_rolling_resistance(dt):
             self.set_up_next_shot()
-            return
-
-        # Scale linear and spin together so the ball keeps rolling consistently
-        scale = (speed - decrement) / speed
-        self.ball_body.setLinearVelocity(Vec3(velocity.x * scale, velocity.y * scale, velocity.z))
-        self.ball_body.setAngularVelocity(self.ball_body.getAngularVelocity() * scale)
+        return task.cont
 
     def set_up_next_shot(self):
         """Positions camera and club to be ready for next shot."""
@@ -174,20 +145,20 @@ class MinigolfApp(ShowBase):
 
     def start_power_charge(self):
         """Begin charging the meter, unless a stroke or roll is in progress."""
-        if self.swing_in_progress() or self.ball_body.isActive():
+        if self.swing_in_progress() or self.ball.is_rolling():
             return
         self.power_meter.start_charge()
 
     def ball_to_hole_direction(self):
         """Unit vector from the ball to the hole, flattened to the horizontal plane."""
-        to_hole = self.hole_nodepath.getPos(self.render) - self.ball_nodepath.getPos(self.render)
+        to_hole = self.hole_nodepath.getPos(self.render) - self.ball.nodepath.getPos(self.render)
         to_hole.z = 0
         if to_hole.length() > 0:
             to_hole.normalize()
         return to_hole
 
     def position_game_camera(self):
-        ball_pos = self.ball_nodepath.getPos(self.render)
+        ball_pos = self.ball.nodepath.getPos(self.render)
         to_hole = self.ball_to_hole_direction()
 
         # Sit CAMERA_BACK_DISTANCE behind the ball, opposite the hole
@@ -196,14 +167,14 @@ class MinigolfApp(ShowBase):
             ball_pos.y - to_hole.y * CAMERA_BACK_DISTANCE,
             ball_pos.z + CAMERA_HEIGHT,
         )
-        self.camera.lookAt(self.ball_nodepath)
+        self.camera.lookAt(self.ball.nodepath)
 
     def update_game_camera(self, task):
         """Trail the ball while it rolls, holding the framing from the putt."""
-        if self.game_camera_active and self.ball_body.isActive():
-            ball_pos = self.ball_nodepath.getPos(self.render)
+        if self.game_camera_active and self.ball.is_rolling():
+            ball_pos = self.ball.nodepath.getPos(self.render)
             self.camera.setPos(ball_pos + self.camera_follow_offset)
-            self.camera.lookAt(self.ball_nodepath)
+            self.camera.lookAt(self.ball.nodepath)
         return task.cont
 
     def toggle_camera(self):
@@ -263,39 +234,6 @@ class MinigolfApp(ShowBase):
         self.hole_nodepath = hole
         return hole
 
-    def place_ball(self, parent):
-        """Seat the ball on the green as a dynamic physics body."""
-        ball = self.loader.loadModel(f"{ASSET_DIRECTORY}/{BALL_BLUE}{ASSET_EXTENSION}")
-
-        # model can be aligned to the body origin (where the sphere sits).
-        ball_min, ball_max = ball.getTightBounds()
-        radius = (ball_max.z - ball_min.z) / 2
-        center = (ball_min + ball_max) / 2
-
-        shape = BulletSphereShape(radius)
-        ball_body = BulletRigidBodyNode(BALL_BODY)
-        ball_body.addShape(shape)
-        ball_body.setMass(BALL_MASS)
-        ball_body.setFriction(SURFACE_FRICTION)
-        ball_body.setRestitution(SURFACE_RESTITUTION)
-
-        ball_nodepath = parent.attachNewNode(ball_body)
-        ball_nodepath.setPos(0, 0.15, GREEN_SURFACE_Z + radius)
-
-        # Park the visual model under the body, centered on the body origin.
-        ball.reparentTo(ball_nodepath)
-        ball.setPos(-center)
-
-        self.physics_world.attachRigidBody(ball_body)
-
-        ball_body.setActive(False)
-
-        # Save variables
-        self.ball = ball
-        self.ball_body = ball_body
-        self.ball_nodepath = ball_nodepath
-        return ball
-
     def place_club(self, parent):
         """Rest the club on the green, head pointing down the lane (rough pass)."""
         club = self.loader.loadModel(f"{ASSET_DIRECTORY}/{CLUB_BLUE}{ASSET_EXTENSION}")
@@ -335,7 +273,7 @@ class MinigolfApp(ShowBase):
 
     def position_club_behind_ball(self):
         """Place the club behind the ball, aim it down to the hole"""
-        ball_pos = self.ball_nodepath.getPos(self.render)
+        ball_pos = self.ball.nodepath.getPos(self.render)
         hole_pos = self.hole_nodepath.getPos(self.render)
 
         self.club_anchor.setPos(ball_pos)
@@ -351,7 +289,7 @@ class MinigolfApp(ShowBase):
         self.power_meter.stop()
 
         # Block a new putt while the club is still swinging or the ball is still rolling
-        if self.swing_in_progress() or self.ball_body.isActive():
+        if self.swing_in_progress() or self.ball.is_rolling():
             return
 
         pivot = self.club_pivot
@@ -371,13 +309,12 @@ class MinigolfApp(ShowBase):
     def on_ball_contact(self):
         """Club has reached the ball at address — launch the putt."""
         # Prevent camera from flipping its position pre-hit
-        ball_pos = self.ball_nodepath.getPos(self.render)
+        ball_pos = self.ball.nodepath.getPos(self.render)
         self.camera_follow_offset = self.camera.getPos(self.render) - ball_pos
 
         # Launch the ball straight at the hole, harder the fuller the power bar was
         launch_speed = MAX_PUTT_SPEED * self.power_meter.fraction()
-        self.ball_body.setLinearVelocity(self.ball_to_hole_direction() * launch_speed)
-        self.ball_body.setActive(True)
+        self.ball.launch(self.ball_to_hole_direction(), launch_speed)
 
 
 if __name__ == "__main__":
