@@ -1,3 +1,4 @@
+from direct.gui.DirectGui import DirectWaitBar
 from direct.interval.IntervalGlobal import Func, LerpHprInterval, Sequence
 from direct.showbase.ShowBase import ShowBase
 from panda3d.bullet import (
@@ -56,6 +57,14 @@ CAMERA_BACK_DISTANCE = 5.0
 CAMERA_HEIGHT = 3.5
 GAME_CAMERA_TASK_NAME = "update_game_camera"
 
+# Power meter UI
+POWER_METER_RANGE = 100
+POWER_METER_START_VALUE = 50
+POWER_METER_BAR_COLOR = (1, 0, 0, 1)  # Red fill
+POWER_METER_FRAME_COLOR = (0.2, 0.2, 0.2, 1)  # Gray background
+POWER_METER_FRAME_SIZE = (-0.35, 0.35, -0.04, 0.04)
+POWER_METER_POSITION = (0, 0, -0.85)  # Bottom center
+
 # Asset model names (files under ASSET_DIRECTORY)
 TILE_START = "start"
 TILE_STRAIGHT = "straight"
@@ -96,6 +105,7 @@ class MinigolfApp(ShowBase):
 
         self.orbit_camera = OrbitCamera(self, self.course, enabled=False)
         self.setup_game_camera()
+        self.setup_power_meter()
 
         # Press space to take a putt swing
         self.swing_sequence = None
@@ -167,6 +177,17 @@ class MinigolfApp(ShowBase):
         self.game_camera_active = True
         self.position_game_camera()
         self.taskMgr.add(self.update_game_camera, GAME_CAMERA_TASK_NAME)
+
+    def setup_power_meter(self):
+        """Half-filled red-on-gray meter overlaid at the bottom of the screen."""
+        self.power_meter = DirectWaitBar(
+            value=POWER_METER_START_VALUE,
+            range=POWER_METER_RANGE,
+            barColor=POWER_METER_BAR_COLOR,
+            frameColor=POWER_METER_FRAME_COLOR,
+            frameSize=POWER_METER_FRAME_SIZE,
+            pos=POWER_METER_POSITION,
+        )
 
     def ball_to_hole_direction(self):
         """Unit vector from the ball to the hole, flattened to the horizontal plane."""
