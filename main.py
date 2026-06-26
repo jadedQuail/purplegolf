@@ -1,26 +1,12 @@
 from direct.showbase.ShowBase import ShowBase
-from panda3d.bullet import (
-    BulletDebugNode,
-    BulletRigidBodyNode,
-    BulletTriangleMesh,
-    BulletTriangleMeshShape,
-    BulletWorld,
-)
+from panda3d.bullet import BulletDebugNode, BulletWorld
 from panda3d.core import Vec3
 
 from ball import Ball
 from club import Club
-from constants import (
-    ASSET_DIRECTORY,
-    ASSET_EXTENSION,
-    GREEN_SURFACE_Z,
-    SURFACE_FRICTION,
-    SURFACE_RESTITUTION,
-)
+from course import Course
 from orbit_camera import OrbitCamera
 from power_meter import PowerMeter
-
-TILE_SIZE = 1.0
 
 # Physics
 GRAVITY = (0, 0, -9.81)
@@ -38,18 +24,8 @@ CAMERA_BACK_DISTANCE = 5.0
 CAMERA_HEIGHT = 3.5
 GAME_CAMERA_TASK_NAME = "update_game_camera"
 
-# Asset model names (files under ASSET_DIRECTORY)
-TILE_START = "start"
-TILE_STRAIGHT = "straight"
-TILE_HOLE_ROUND = "hole-round"
-
 # Scene-graph node names
-COURSE_NODE = "course"
 PHYSICS_DEBUG_NODE = "physics_debug"
-HOLE_NODE = "hole"
-
-# Physics body names (used to identify bodies in collisions)
-TILE_BODY = "tile"
 
 
 class MinigolfApp(ShowBase):
@@ -61,18 +37,16 @@ class MinigolfApp(ShowBase):
 
         self.setup_physics()
 
-        self.course = self.render.attachNewNode(COURSE_NODE)
-
-        self.build_course(course=self.course)
+        self.course = Course(self)
 
         # Ball is a world-space physics body, parented straight to render
         self.ball = Ball(self, self.render)
 
         ball_pos = self.ball.nodepath.getPos(self.render)
-        hole_pos = self.hole_nodepath.getPos(self.render)
-        self.club = Club(self, self.course, ball_pos, hole_pos)
+        hole_pos = self.course.hole.getPos(self.render)
+        self.club = Club(self, self.course.root, ball_pos, hole_pos)
 
-        self.orbit_camera = OrbitCamera(self, self.course, enabled=False)
+        self.orbit_camera = OrbitCamera(self, self.course.root, enabled=False)
         self.setup_game_camera()
         self.power_meter = PowerMeter(self)
 
@@ -113,7 +87,7 @@ class MinigolfApp(ShowBase):
     def set_up_next_shot(self):
         """Positions camera and club to be ready for next shot."""
         ball_pos = self.ball.nodepath.getPos(self.render)
-        hole_pos = self.hole_nodepath.getPos(self.render)
+        hole_pos = self.course.hole.getPos(self.render)
         self.club.aim_behind(ball_pos, hole_pos)
         if self.game_camera_active:
             self.position_game_camera()
@@ -132,7 +106,7 @@ class MinigolfApp(ShowBase):
 
     def ball_to_hole_direction(self):
         """Unit vector from the ball to the hole, flattened to the horizontal plane."""
-        to_hole = self.hole_nodepath.getPos(self.render) - self.ball.nodepath.getPos(self.render)
+        to_hole = self.course.hole.getPos(self.render) - self.ball.nodepath.getPos(self.render)
         to_hole.z = 0
         if to_hole.length() > 0:
             to_hole.normalize()
@@ -166,54 +140,6 @@ class MinigolfApp(ShowBase):
             self.position_game_camera()
         else:
             self.orbit_camera.enable()
-
-    def load_tile(self, parent, name, x, y, heading=0):
-        """Load a tile by name, place it on the grid at (x, y), and collider it."""
-        tile = self.loader.loadModel(f"{ASSET_DIRECTORY}/{name}{ASSET_EXTENSION}")
-        tile.reparentTo(parent)
-        tile.setPos(x * TILE_SIZE, y * TILE_SIZE, 0)
-        tile.setH(heading)
-        self.make_tile_collider(tile)
-        return tile
-
-    def make_tile_collider(self, model):
-        """Build a static collider that traces a tile's mesh"""
-        mesh = BulletTriangleMesh()
-        for geom_nodepath in model.findAllMatches("**/+GeomNode"):
-            geom_node = geom_nodepath.node()
-            # Keep each piece's placement relative to the tile root.
-            transform = geom_nodepath.getTransform(model)
-            for i in range(geom_node.getNumGeoms()):
-                mesh.addGeom(geom_node.getGeom(i), True, transform)
-
-        shape = BulletTriangleMeshShape(mesh, dynamic=False)
-        tile_body = BulletRigidBodyNode(TILE_BODY)
-        tile_body.addShape(shape)
-        tile_body.setFriction(SURFACE_FRICTION)
-        tile_body.setRestitution(SURFACE_RESTITUTION)
-
-        collider_nodepath = model.attachNewNode(tile_body)
-        self.physics_world.attachRigidBody(tile_body)
-        return collider_nodepath
-
-    def build_course(self, course):
-        """Tee off, run down a short fairway, into the hole."""
-        self.load_tile(parent=course, name=TILE_START, x=0, y=0)
-        self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=1)
-        self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=2)
-        self.load_tile(parent=course, name=TILE_STRAIGHT, x=0, y=3)
-
-        hole_tile = self.load_tile(parent=course, name=TILE_HOLE_ROUND, x=0, y=4, heading=180)
-        self.place_hole(parent=hole_tile)
-
-    def place_hole(self, parent):
-        """Mark the cup so we can aim shots and the camera at it later."""
-        hole = parent.attachNewNode(HOLE_NODE)
-
-        # Cup sits at the center of the hole tile, on the green surface
-        hole.setPos(0, 0, GREEN_SURFACE_Z)
-        self.hole_nodepath = hole
-        return hole
 
     def swing_club(self):
         """Take a putt swing, unless a stroke or roll is already underway."""
