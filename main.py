@@ -41,7 +41,7 @@ GRAVITY = (0, 0, -9.81)
 PHYSICS_TASK_NAME = "step_physics"
 
 BALL_MASS = 1.0
-PUTT_SPEED = 2.0
+MAX_PUTT_SPEED = 5.0 # Ball speed at a full power bar; scaled down by fill percentage
 SURFACE_FRICTION = 0.6
 # Bounciness
 SURFACE_RESTITUTION = 0.8
@@ -221,6 +221,11 @@ class MinigolfApp(ShowBase):
 
         self.power_meter["value"] = value
         return task.cont
+
+    def power_meter_fraction(self):
+        """How full the meter is, from 0.0 (empty) to 1.0 (full)."""
+        span = POWER_METER_RANGE - POWER_METER_MIN
+        return (self.power_meter["value"] - POWER_METER_MIN) / span
 
     def ball_to_hole_direction(self):
         """Unit vector from the ball to the hole, flattened to the horizontal plane."""
@@ -418,8 +423,9 @@ class MinigolfApp(ShowBase):
         ball_pos = self.ball_nodepath.getPos(self.render)
         self.camera_follow_offset = self.camera.getPos(self.render) - ball_pos
 
-        # Launch the ball straight at the hole
-        self.ball_body.setLinearVelocity(self.ball_to_hole_direction() * PUTT_SPEED)
+        # Launch the ball straight at the hole, harder the fuller the power bar was
+        launch_speed = MAX_PUTT_SPEED * self.power_meter_fraction()
+        self.ball_body.setLinearVelocity(self.ball_to_hole_direction() * launch_speed)
         self.ball_body.setActive(True)
 
 
