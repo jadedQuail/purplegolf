@@ -48,8 +48,9 @@ SURFACE_RESTITUTION = 0.8
 ROLLING_RESISTANCE_CONSTANT = 0.12
 ROLLING_DRAG = 0.7
 
-# Key that triggers a putt swing
+# Hold this key and release to take a putt swing
 SWING_KEY = "space"
+SWING_RELEASE_EVENT = f"{SWING_KEY}-up"
 TOGGLE_CAMERA_KEY = "c"
 
 # Gameplay camera placement, relative to the ball
@@ -58,8 +59,12 @@ CAMERA_HEIGHT = 3.5
 GAME_CAMERA_TASK_NAME = "update_game_camera"
 
 # Power meter UI
-POWER_METER_RANGE = 100
-POWER_METER_START_VALUE = 50
+POWER_METER_RANGE = 100  # Value at a full bar
+POWER_METER_MIN = 0  # Empty bar; also where each charge starts
+POWER_METER_FILL_SPEED = 100  # Units per second the bar sweeps while space is held
+POWER_METER_SWEEP_UP = 1  # Direction multiplier: bar rising
+POWER_METER_SWEEP_DOWN = -1  # Direction multiplier: bar falling
+POWER_METER_TASK_NAME = "charge_power_meter"
 POWER_METER_BAR_COLOR = (1, 0, 0, 1)  # Red fill
 POWER_METER_FRAME_COLOR = (0.2, 0.2, 0.2, 1)  # Gray background
 POWER_METER_FRAME_SIZE = (-0.35, 0.35, -0.04, 0.04)
@@ -107,7 +112,7 @@ class MinigolfApp(ShowBase):
         self.setup_game_camera()
         self.setup_power_meter()
 
-        # Press space to take a putt swing
+        # Hold space and release to take a putt swing
         self.swing_sequence = None
         
         # Camera-to-ball offset captured at contact, used to trail the ball while it rolls
@@ -115,7 +120,8 @@ class MinigolfApp(ShowBase):
 
         # Keys
         self.accept(TOGGLE_CAMERA_KEY, self.toggle_camera)
-        self.accept(SWING_KEY, self.swing_club)
+        self.accept(SWING_KEY, self.start_power_charge)
+        self.accept(SWING_RELEASE_EVENT, self.swing_club)
 
     def setup_physics(self):
         """Stand up the Bullet world and step it every frame (no bodies yet)."""
@@ -181,13 +187,40 @@ class MinigolfApp(ShowBase):
     def setup_power_meter(self):
         """Half-filled red-on-gray meter overlaid at the bottom of the screen."""
         self.power_meter = DirectWaitBar(
-            value=POWER_METER_START_VALUE,
+            value=POWER_METER_MIN,
             range=POWER_METER_RANGE,
             barColor=POWER_METER_BAR_COLOR,
             frameColor=POWER_METER_FRAME_COLOR,
             frameSize=POWER_METER_FRAME_SIZE,
             pos=POWER_METER_POSITION,
         )
+        # Sweeps the bar up or down; flips at each end while charging
+        self.power_meter_direction = POWER_METER_SWEEP_UP
+
+    def start_power_charge(self):
+        """While space is held, sweep the meter up and down between min and max."""
+        # Don't charge mid-stroke or while the ball is still rolling
+        if self.swing_in_progress() or self.ball_body.isActive():
+            return
+        # Each new putt starts from an empty bar, sweeping up
+        self.power_meter["value"] = POWER_METER_MIN
+        self.power_meter_direction = POWER_METER_SWEEP_UP
+        self.taskMgr.add(self.charge_power_meter, POWER_METER_TASK_NAME)
+
+    def charge_power_meter(self, task):
+        """Advance the meter one frame, bouncing off the min and max ends."""
+        value = self.power_meter["value"]
+        value += self.power_meter_direction * POWER_METER_FILL_SPEED * self.clock.getDt()
+
+        if value >= POWER_METER_RANGE:
+            value = POWER_METER_RANGE
+            self.power_meter_direction = POWER_METER_SWEEP_DOWN
+        elif value <= POWER_METER_MIN:
+            value = POWER_METER_MIN
+            self.power_meter_direction = POWER_METER_SWEEP_UP
+
+        self.power_meter["value"] = value
+        return task.cont
 
     def ball_to_hole_direction(self):
         """Unit vector from the ball to the hole, flattened to the horizontal plane."""
@@ -358,6 +391,9 @@ class MinigolfApp(ShowBase):
 
     def swing_club(self):
         """Play one putt stroke: back, through, then settle to rest."""
+        # Releasing space stops the meter wherever it landed
+        self.taskMgr.remove(POWER_METER_TASK_NAME)
+
         # Block a new putt while the club is still swinging or the ball is still rolling
         if self.swing_in_progress() or self.ball_body.isActive():
             return
