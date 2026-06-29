@@ -1,10 +1,11 @@
 from direct.showbase.ShowBase import ShowBase
 from panda3d.bullet import (
+    BulletPlaneShape,
     BulletRigidBodyNode,
     BulletTriangleMesh,
     BulletTriangleMeshShape,
 )
-from panda3d.core import NodePath
+from panda3d.core import Geom, GeomVertexReader, Mat4, NodePath, Vec3
 
 from constants import (
     ASSET_DIRECTORY,
@@ -23,6 +24,9 @@ TILE_HOLE_ROUND_ASSET_NAME = "hole-round"
 COURSE_NODE = "course"
 HOLE_NODE = "hole"
 TILE_BODY = "tile"
+GROUND_BODY = "ground"
+
+WALL_MIN_Z = GREEN_SURFACE_Z + 0.01
 
 
 class Course:
@@ -39,8 +43,20 @@ class Course:
         self.base: ShowBase = base
         self.root: NodePath = base.render.attachNewNode(COURSE_NODE)
 
+        self._make_ground()
         hole_tile = self._lay_tiles()
         self.hole: NodePath = self._place_hole(hole_tile)
+
+    def _make_ground(self) -> None:
+        """A single flat plane the ball rolls on, so the green is perfectly level."""
+        shape = BulletPlaneShape(Vec3(0, 0, 1), GREEN_SURFACE_Z)
+        body = BulletRigidBodyNode(GROUND_BODY)
+        body.addShape(shape)
+        body.setFriction(SURFACE_FRICTION)
+        body.setRestitution(SURFACE_RESTITUTION)
+
+        self.root.attachNewNode(body)
+        self.base.physics_world.attachRigidBody(body)
 
     def _lay_tiles(self) -> NodePath:
         """Tee off, run down a short fairway. Returns the hole tile (the last one)."""
@@ -61,14 +77,17 @@ class Course:
         return tile
 
     def _make_tile_collider(self, model: NodePath) -> NodePath:
-        """Build a static collider that traces a tile's mesh."""
+        """Build a static collider tracing only a tile's raised walls.
+
+        The flat green is handled by the shared ground plane, so the ball never
+        rolls over the tile mesh's faceted, slightly-uneven surface triangles.
+        """
         mesh = BulletTriangleMesh()
         for geom_nodepath in model.findAllMatches("**/+GeomNode"):
             geom_node = geom_nodepath.node()
-            # Keep each piece's placement relative to the tile root.
-            transform = geom_nodepath.getTransform(model)
+            to_tile = geom_nodepath.getTransform(model).getMat()
             for i in range(geom_node.getNumGeoms()):
-                mesh.addGeom(geom_node.getGeom(i), True, transform)
+                self._add_wall_triangles(mesh, geom_node.getGeom(i), to_tile)
 
         shape = BulletTriangleMeshShape(mesh, dynamic=False)
         tile_body = BulletRigidBodyNode(TILE_BODY)
@@ -79,6 +98,21 @@ class Course:
         collider_nodepath = model.attachNewNode(tile_body)
         self.base.physics_world.attachRigidBody(tile_body)
         return collider_nodepath
+
+    def _add_wall_triangles(self, mesh: BulletTriangleMesh, geom: Geom, to_tile: Mat4) -> None:
+        """Add a geom's triangles to mesh, skipping any that lie at or below the green."""
+        vertex = GeomVertexReader(geom.getVertexData(), "vertex")
+        for primitive in geom.getPrimitives():
+            triangles = primitive.decompose()
+            for t in range(triangles.getNumPrimitives()):
+                start = triangles.getPrimitiveStart(t)
+                end = triangles.getPrimitiveEnd(t)
+                corners = []
+                for index in range(start, end):
+                    vertex.setRow(triangles.getVertex(index))
+                    corners.append(to_tile.xformPoint(vertex.getData3()))
+                if max(corner.z for corner in corners) > WALL_MIN_Z:
+                    mesh.addTriangle(corners[0], corners[1], corners[2])
 
     def _place_hole(self, parent: NodePath) -> NodePath:
         """Mark the cup so we can aim shots and the camera at it later."""
