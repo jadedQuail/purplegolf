@@ -1,5 +1,6 @@
 from direct.showbase.ShowBase import ShowBase
 from panda3d.bullet import BulletDebugNode, BulletWorld
+from panda3d.core import Quat, Vec3
 
 from ball import Ball
 from club import Club
@@ -40,6 +41,8 @@ class MinigolfApp(ShowBase):
         ball_pos = self.ball.nodepath.getPos(self.render)
         hole_pos = self.course.hole.getPos(self.render)
         self.club = Club(self, self.course.root, ball_pos, hole_pos)
+
+        self.aim_offset_degrees: float = 0.0
 
         self.orbit_camera = OrbitCamera(self, self.course.root, enabled=False)
         self.game_camera = GameCamera(self, self.ball)
@@ -99,9 +102,18 @@ class MinigolfApp(ShowBase):
             to_hole.normalize()
         return to_hole
 
+    def aim_direction(self) -> Vec3:
+        """Where the player is aiming: the line to the hole, turned by the aim offset."""
+        direction = self.ball_to_hole_direction()
+        if self.aim_offset_degrees:
+            rotation = Quat()
+            rotation.setFromAxisAngle(self.aim_offset_degrees, Vec3.up())
+            direction = rotation.xform(direction)
+        return direction
+
     def position_game_camera(self):
-        """Frame the ball from behind, aimed down the line to the hole."""
-        self.game_camera.position_behind(self.ball_to_hole_direction())
+        """Frame the ball from behind, aimed down the current aim line."""
+        self.game_camera.position_behind(self.aim_direction())
 
     def toggle_camera(self):
         """Swap between the gameplay camera (default) and the orbit dev camera."""
@@ -128,9 +140,9 @@ class MinigolfApp(ShowBase):
         # Prevent camera from flipping its position pre-hit
         self.game_camera.capture_follow_offset()
 
-        # Launch the ball straight at the hole, harder the fuller the power bar was
+        # Launch the ball along the current aim, harder the fuller the power bar was
         launch_speed = MAX_PUTT_SPEED * self.power_meter.fraction()
-        self.ball.launch(self.ball_to_hole_direction(), launch_speed)
+        self.ball.launch(self.aim_direction(), launch_speed)
 
 
 if __name__ == "__main__":
