@@ -102,7 +102,7 @@ class MinigolfApp(ShowBase):
             to_hole.normalize()
         return to_hole
 
-    def aim_direction(self) -> Vec3:
+    def compute_aim_direction(self) -> Vec3:
         """Where the player is aiming: the line to the hole, turned by the aim offset."""
         direction = self.ball_to_hole_direction()
         if self.aim_offset_degrees:
@@ -113,7 +113,7 @@ class MinigolfApp(ShowBase):
 
     def position_game_camera(self):
         """Frame the ball from behind, aimed down the current aim line."""
-        self.game_camera.position_behind(self.aim_direction())
+        self.game_camera.position_behind(self.compute_aim_direction())
 
     def toggle_camera(self):
         """Swap between the gameplay camera (default) and the orbit dev camera."""
@@ -142,7 +142,7 @@ class MinigolfApp(ShowBase):
 
         # Launch the ball along the current aim, harder the fuller the power bar was
         launch_speed = MAX_PUTT_SPEED * self.power_meter.fraction()
-        self.ball.launch(self.aim_direction(), launch_speed)
+        self.ball.launch(self.compute_aim_direction(), launch_speed)
 
 
 if __name__ == "__main__":
