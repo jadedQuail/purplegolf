@@ -1,11 +1,10 @@
 from direct.showbase.ShowBase import ShowBase
 from panda3d.bullet import (
-    BulletPlaneShape,
     BulletRigidBodyNode,
     BulletTriangleMesh,
     BulletTriangleMeshShape,
 )
-from panda3d.core import Geom, GeomVertexReader, Mat4, NodePath, Vec3
+from panda3d.core import Geom, GeomVertexReader, Mat4, NodePath, Point3, Vec3
 
 from constants import (
     ASSET_DIRECTORY,
@@ -16,6 +15,12 @@ from constants import (
 )
 
 TILE_SIZE = 1.0
+LAST_TILE_Y = 4
+
+GROUND_MIN_X = -TILE_SIZE / 2
+GROUND_MAX_X = TILE_SIZE / 2
+GROUND_MIN_Y = -TILE_SIZE / 2
+GROUND_MAX_Y = LAST_TILE_Y * TILE_SIZE + TILE_SIZE / 2
 
 TILE_START_ASSET_NAME = "start"
 TILE_STRAIGHT_ASSET_NAME = "straight"
@@ -48,8 +53,11 @@ class Course:
         self.hole: NodePath = self._place_hole(hole_tile)
 
     def _make_ground(self) -> None:
-        """A single flat plane the ball rolls on, so the green is perfectly level."""
-        shape = BulletPlaneShape(Vec3(0, 0, 1), GREEN_SURFACE_Z)
+        """A flat floor the ball rolls on, built as a mesh we can carve later."""
+        mesh = BulletTriangleMesh()
+        self._add_floor_triangles(mesh)
+
+        shape = BulletTriangleMeshShape(mesh, dynamic=False)
         body = BulletRigidBodyNode(GROUND_BODY)
         body.addShape(shape)
         body.setFriction(SURFACE_FRICTION)
@@ -57,6 +65,15 @@ class Course:
 
         self.root.attachNewNode(body)
         self.base.physics_world.attachRigidBody(body)
+
+    def _add_floor_triangles(self, mesh: BulletTriangleMesh) -> None:
+        """Lay the green as a single flat quad spanning the course footprint."""
+        corner_a = Point3(GROUND_MIN_X, GROUND_MIN_Y, GREEN_SURFACE_Z)
+        corner_b = Point3(GROUND_MAX_X, GROUND_MIN_Y, GREEN_SURFACE_Z)
+        corner_c = Point3(GROUND_MAX_X, GROUND_MAX_Y, GREEN_SURFACE_Z)
+        corner_d = Point3(GROUND_MIN_X, GROUND_MAX_Y, GREEN_SURFACE_Z)
+        mesh.addTriangle(corner_a, corner_b, corner_c)
+        mesh.addTriangle(corner_a, corner_c, corner_d)
 
     def _lay_tiles(self) -> NodePath:
         """Tee off, run down a short fairway. Returns the hole tile (the last one)."""
