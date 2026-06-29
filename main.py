@@ -20,6 +20,11 @@ SWING_KEY = "space"
 SWING_RELEASE_EVENT = f"{SWING_KEY}-up"
 TOGGLE_CAMERA_KEY = "c"
 
+AIM_LEFT_KEY = "arrow_left"
+AIM_RIGHT_KEY = "arrow_right"
+AIM_TURN_SPEED_DEGREES_PER_SEC = 60.0
+AIM_TASK_NAME = "update_aim"
+
 # Scene-graph node names
 PHYSICS_DEBUG_NODE = "physics_debug"
 
@@ -43,6 +48,8 @@ class MinigolfApp(ShowBase):
         self.club = Club(self, self.course.root, ball_pos, hole_pos)
 
         self.aim_offset_degrees: float = 0.0
+        self.aim_left_held: bool = False
+        self.aim_right_held: bool = False
 
         self.orbit_camera = OrbitCamera(self, self.course.root, enabled=False)
         self.game_camera = GameCamera(self, self.ball)
@@ -53,6 +60,13 @@ class MinigolfApp(ShowBase):
         self.accept(TOGGLE_CAMERA_KEY, self.toggle_camera)
         self.accept(SWING_KEY, self.start_power_charge)
         self.accept(SWING_RELEASE_EVENT, self.swing_club)
+
+        self.accept(AIM_LEFT_KEY, self.set_aim_left, [True])
+        self.accept(f"{AIM_LEFT_KEY}-up", self.set_aim_left, [False])
+        self.accept(AIM_RIGHT_KEY, self.set_aim_right, [True])
+        self.accept(f"{AIM_RIGHT_KEY}-up", self.set_aim_right, [False])
+
+        self.taskMgr.add(self.update_aim, AIM_TASK_NAME)
 
     def setup_physics(self):
         """Stand up the Bullet world and step it every frame (no bodies yet)."""
@@ -101,6 +115,25 @@ class MinigolfApp(ShowBase):
         if to_hole.length() > 0:
             to_hole.normalize()
         return to_hole
+
+    def set_aim_left(self, held: bool):
+        """Arrow key state: whether the player is holding left."""
+        self.aim_left_held = held
+
+    def set_aim_right(self, held: bool):
+        """Arrow key state: whether the player is holding right."""
+        self.aim_right_held = held
+
+    def update_aim(self, task):
+        """Each frame, swivel the aim while an arrow key is held (delay-free)."""
+        direction = float(self.aim_left_held) - float(self.aim_right_held)
+        if direction and not (self.club.is_swinging() or self.ball.is_rolling()):
+            self.aim_offset_degrees += (
+                direction * AIM_TURN_SPEED_DEGREES_PER_SEC * self.clock.getDt()
+            )
+            if self.game_camera.active:
+                self.position_game_camera()
+        return task.cont
 
     def compute_aim_direction(self) -> Vec3:
         """Where the player is aiming: the line to the hole, turned by the aim offset."""
