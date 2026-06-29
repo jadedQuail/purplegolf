@@ -96,15 +96,22 @@ class MinigolfApp(ShowBase):
 
     def set_up_next_shot(self):
         """Positions camera and club to be ready for next shot."""
-        ball_pos = self.ball.nodepath.getPos(self.render)
-        hole_pos = self.course.hole.getPos(self.render)
-        self.club.aim_behind(ball_pos, hole_pos)
+        self.aim_club()
         if self.game_camera.active:
             self.position_game_camera()
 
+    def aim_club(self):
+        """Point the club down the current aim line."""
+        ball_pos = self.ball.nodepath.getPos(self.render)
+        self.club.aim_along(ball_pos, self.compute_aim_direction())
+
+    def is_shot_in_progress(self) -> bool:
+        """True while the club is mid-stroke or the ball is still rolling."""
+        return self.club.is_swinging() or self.ball.is_rolling()
+
     def start_power_charge(self):
         """Begin charging the meter, unless a stroke or roll is in progress."""
-        if self.club.is_swinging() or self.ball.is_rolling():
+        if self.is_shot_in_progress():
             return
         self.power_meter.start_charge()
 
@@ -127,10 +134,11 @@ class MinigolfApp(ShowBase):
     def update_aim(self, task):
         """Each frame, swivel the aim while an arrow key is held (delay-free)."""
         direction = float(self.aim_left_held) - float(self.aim_right_held)
-        if direction and not (self.club.is_swinging() or self.ball.is_rolling()):
+        if direction and not self.is_shot_in_progress():
             self.aim_offset_degrees += (
                 direction * AIM_TURN_SPEED_DEGREES_PER_SEC * self.clock.getDt()
             )
+            self.aim_club()
             if self.game_camera.active:
                 self.position_game_camera()
         return task.cont
@@ -163,7 +171,7 @@ class MinigolfApp(ShowBase):
         self.power_meter.stop()
 
         # Block a new putt while the club is still swinging or the ball is still rolling
-        if self.club.is_swinging() or self.ball.is_rolling():
+        if self.is_shot_in_progress():
             return
 
         self.club.swing(self.on_ball_contact)

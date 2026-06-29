@@ -2,7 +2,7 @@ from typing import Callable
 
 from direct.interval.IntervalGlobal import Func, LerpHprInterval, Sequence
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import NodePath, Point3
+from panda3d.core import NodePath, Point3, Vec3
 
 from constants import ASSET_DIRECTORY, ASSET_EXTENSION, GREEN_SURFACE_Z
 
@@ -65,8 +65,13 @@ class Club:
 
     def aim_behind(self, ball_pos: Point3, hole_pos: Point3) -> None:
         """Place the club behind the ball, aimed down the line to the hole."""
+        self.aim_along(ball_pos, hole_pos - ball_pos)
+
+    def aim_along(self, ball_pos: Point3, direction: Vec3) -> None:
+        """Place the club behind the ball, aimed along the given direction."""
         self.anchor.setPos(ball_pos)
-        self.anchor.lookAt(self.base.render, Point3(hole_pos.x, hole_pos.y, ball_pos.z))
+        target = Point3(ball_pos.x + direction.x, ball_pos.y + direction.y, ball_pos.z)
+        self.anchor.lookAt(self.base.render, target)
 
     def is_swinging(self) -> bool:
         """True while the club is mid-stroke."""
