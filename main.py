@@ -50,6 +50,7 @@ class MinigolfApp(ShowBase):
         self.aim_offset_degrees: float = 0.0
         self.aim_left_held: bool = False
         self.aim_right_held: bool = False
+        self.ball_holed: bool = False
 
         self.orbit_camera = OrbitCamera(self, self.course.root, enabled=False)
         self.game_camera = GameCamera(self, self.ball)
@@ -94,7 +95,16 @@ class MinigolfApp(ShowBase):
         self.physics_world.doPhysics(dt)
         if self.ball.apply_rolling_resistance(dt):
             self.set_up_next_shot()
+        self.check_for_hole()
         return task.cont
+
+    def check_for_hole(self):
+        """Announce, once, when the ball settles into the bottom of the cup."""
+        if self.ball_holed:
+            return
+        if self.course.is_ball_on_cup_bottom(self.ball.body):
+            self.ball_holed = True
+            print("The ball hit the bottom of the cup!")
 
     def set_up_next_shot(self):
         """Positions camera and club to be ready for next shot."""

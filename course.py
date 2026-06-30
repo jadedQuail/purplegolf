@@ -42,6 +42,7 @@ COURSE_NODE = "course"
 HOLE_NODE = "hole"
 TILE_BODY = "tile"
 GROUND_BODY = "ground"
+CUP_BOTTOM_BODY = "cup_bottom"
 
 WALL_MIN_Z = GREEN_SURFACE_Z + 0.01
 
@@ -68,12 +69,13 @@ class Course:
         """The green and cup as box colliders"""
         body = BulletRigidBodyNode(GROUND_BODY)
         self._add_green_boxes(body)
-        self._add_cup_bottom(body)
         body.setFriction(SURFACE_FRICTION)
         body.setRestitution(SURFACE_RESTITUTION)
 
         self.root.attachNewNode(body)
         self.base.physics_world.attachRigidBody(body)
+
+        self.cup_bottom: BulletRigidBodyNode = self._make_cup_bottom()
 
     def _add_green_boxes(self, body: BulletRigidBodyNode) -> None:
         """Draws collider boxes on the course, leaving a gap at the hole"""
@@ -82,9 +84,21 @@ class Course:
         self._add_box(body, GROUND_MIN_X, GAP_MIN_X, GAP_MIN_Y, GAP_MAX_Y, GREEN_SURFACE_Z)
         self._add_box(body, GAP_MAX_X, GROUND_MAX_X, GAP_MIN_Y, GAP_MAX_Y, GREEN_SURFACE_Z)
 
-    def _add_cup_bottom(self, body: BulletRigidBodyNode) -> None:
-        """Close the bottom of the cup so the ball is caught and held."""
+    def _make_cup_bottom(self) -> BulletRigidBodyNode:
+        """Close the bottom of the cup, on its own body so a landing is detectable."""
+        body = BulletRigidBodyNode(CUP_BOTTOM_BODY)
         self._add_box(body, GAP_MIN_X, GAP_MAX_X, GAP_MIN_Y, GAP_MAX_Y, GREEN_SURFACE_Z - HOLE_DEPTH)
+        body.setFriction(SURFACE_FRICTION)
+        body.setRestitution(SURFACE_RESTITUTION)
+
+        self.root.attachNewNode(body)
+        self.base.physics_world.attachRigidBody(body)
+        return body
+
+    def is_ball_on_cup_bottom(self, ball_body: BulletRigidBodyNode) -> bool:
+        """True while the ball is touching the floor of the cup."""
+        contact = self.base.physics_world.contactTestPair(ball_body, self.cup_bottom)
+        return contact.getNumContacts() > 0
 
     def _add_box(
         self, body: BulletRigidBodyNode, min_x: float, max_x: float, min_y: float, max_y: float, top_z: float
