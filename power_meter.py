@@ -54,6 +54,11 @@ class PowerMeter:
         self.stop()
         self.bar.hide()
 
+    def show(self) -> None:
+        """Put the empty bar back on the screen."""
+        self.bar["value"] = MIN
+        self.bar.show()
+
     def fraction(self) -> float:
         """How full the meter is, from 0.0 (empty) to 1.0 (full)."""
         span = RANGE - MIN

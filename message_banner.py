@@ -44,6 +44,10 @@ class MessageBanner:
         )
         self.restart_button.hide()
 
+    def set_restart_command(self, command) -> None:
+        """Set the callback fired when the restart button is clicked."""
+        self.restart_button["command"] = command
+
     def _make_line(self, position: tuple[float, float], scale: float) -> OnscreenText:
         """Build one hidden, centered line of banner text."""
         line = OnscreenText(

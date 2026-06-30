@@ -16,6 +16,7 @@ BALL_BODY = "ball"
 BALL_MASS = 1.0
 ROLLING_RESISTANCE_CONSTANT = 0.12
 ROLLING_DRAG = 0.7
+TEE_Y_OFFSET = 0.15
 
 
 class Ball:
@@ -41,8 +42,9 @@ class Ball:
         body.setFriction(SURFACE_FRICTION)
         body.setRestitution(SURFACE_RESTITUTION)
 
+        start_pos = Vec3(0, TEE_Y_OFFSET, GREEN_SURFACE_Z + radius)
         nodepath = parent.attachNewNode(body)
-        nodepath.setPos(0, 0.15, GREEN_SURFACE_Z + radius)
+        nodepath.setPos(start_pos)
 
         # Park the visual model under the body, centered on the body origin.
         model.reparentTo(nodepath)
@@ -54,6 +56,14 @@ class Ball:
         self.model: NodePath = model
         self.body: BulletRigidBodyNode = body
         self.nodepath: NodePath = nodepath
+        self.start_pos: Vec3 = start_pos
+
+    def reset(self) -> None:
+        """Return the ball to the tee, motionless and asleep."""
+        self.body.setLinearVelocity(Vec3(0, 0, 0))
+        self.body.setAngularVelocity(Vec3(0, 0, 0))
+        self.nodepath.setPos(self.start_pos)
+        self.body.setActive(False)
 
     def is_rolling(self) -> bool:
         """True while the ball is still moving under physics."""

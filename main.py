@@ -60,8 +60,13 @@ class MinigolfApp(ShowBase):
         self.position_game_camera()
         self.power_meter = PowerMeter(self)
         self.message_banner = MessageBanner(self)
+        self.message_banner.set_restart_command(self.restart_hole)
 
-        # Keys
+        self.bind_controls()
+        self.taskMgr.add(self.update_aim, AIM_TASK_NAME)
+
+    def bind_controls(self):
+        """Wire up the camera, swing, and aim keys."""
         self.accept(TOGGLE_CAMERA_KEY, self.toggle_camera)
         self.accept(SWING_KEY, self.start_power_charge)
         self.accept(SWING_RELEASE_EVENT, self.swing_club)
@@ -72,8 +77,6 @@ class MinigolfApp(ShowBase):
         for key in AIM_RIGHT_KEYS:
             self.accept(key, self.set_aim_right, [True])
             self.accept(f"{key}-up", self.set_aim_right, [False])
-
-        self.taskMgr.add(self.update_aim, AIM_TASK_NAME)
 
     def setup_physics(self):
         """Stand up the Bullet world and step it every frame (no bodies yet)."""
@@ -127,6 +130,17 @@ class MinigolfApp(ShowBase):
         for key in AIM_LEFT_KEYS + AIM_RIGHT_KEYS:
             self.ignore(key)
             self.ignore(f"{key}-up")
+
+    def restart_hole(self):
+        """Reset the hole to its opening state for another attempt."""
+        self.ball.reset()
+        self.stroke_count = 0
+        self.start_time = self.clock.getFrameTime()
+        self.ball_holed = False
+        self.message_banner.hide()
+        self.power_meter.show()
+        self.bind_controls()
+        self.set_up_next_shot()
 
     def set_up_next_shot(self):
         """Positions camera and club to be ready for next shot."""
