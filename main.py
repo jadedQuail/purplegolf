@@ -115,6 +115,15 @@ class MinigolfApp(ShowBase):
         self.power_meter.hide()
         self.ignore(SWING_KEY)
         self.ignore(SWING_RELEASE_EVENT)
+        self.freeze_aim()
+
+    def freeze_aim(self):
+        """Unbind the aim keys and stop any turn in progress."""
+        self.aim_left_held = False
+        self.aim_right_held = False
+        for key in AIM_LEFT_KEYS + AIM_RIGHT_KEYS:
+            self.ignore(key)
+            self.ignore(f"{key}-up")
 
     def set_up_next_shot(self):
         """Positions camera and club to be ready for next shot."""
