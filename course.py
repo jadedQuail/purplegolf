@@ -1,10 +1,11 @@
 from direct.showbase.ShowBase import ShowBase
 from panda3d.bullet import (
+    BulletBoxShape,
     BulletRigidBodyNode,
     BulletTriangleMesh,
     BulletTriangleMeshShape,
 )
-from panda3d.core import Geom, GeomVertexReader, Mat4, NodePath, Point3, Vec3
+from panda3d.core import Geom, GeomVertexReader, Mat4, NodePath, Point3, TransformState, Vec3
 
 from constants import (
     ASSET_DIRECTORY,
@@ -26,6 +27,12 @@ HOLE_CENTER_X = 0.0
 HOLE_CENTER_Y = LAST_TILE_Y * TILE_SIZE
 HOLE_GAP_HALF = 0.045
 HOLE_DEPTH = 0.15
+FLOOR_THICKNESS = HOLE_DEPTH + 0.05
+
+GAP_MIN_X = HOLE_CENTER_X - HOLE_GAP_HALF
+GAP_MAX_X = HOLE_CENTER_X + HOLE_GAP_HALF
+GAP_MIN_Y = HOLE_CENTER_Y - HOLE_GAP_HALF
+GAP_MAX_Y = HOLE_CENTER_Y + HOLE_GAP_HALF
 
 TILE_START_ASSET_NAME = "start"
 TILE_STRAIGHT_ASSET_NAME = "straight"
@@ -58,72 +65,34 @@ class Course:
         self.hole: NodePath = self._place_hole(hole_tile)
 
     def _make_ground(self) -> None:
-        """A flat floor the ball rolls on, built as a mesh we can carve later."""
-        mesh = BulletTriangleMesh()
-        self._add_floor_quads(mesh)
-        self._add_cup(mesh)
-
-        shape = BulletTriangleMeshShape(mesh, dynamic=False)
+        """The green and cup as box colliders"""
         body = BulletRigidBodyNode(GROUND_BODY)
-        body.addShape(shape)
+        self._add_green_boxes(body)
+        self._add_cup_bottom(body)
         body.setFriction(SURFACE_FRICTION)
         body.setRestitution(SURFACE_RESTITUTION)
 
         self.root.attachNewNode(body)
         self.base.physics_world.attachRigidBody(body)
 
-    def _add_floor_quads(self, mesh: BulletTriangleMesh) -> None:
-        """Lay the green flat, leaving a square gap at the cup for the ball to drop through."""
-        gap_min_x = HOLE_CENTER_X - HOLE_GAP_HALF
-        gap_max_x = HOLE_CENTER_X + HOLE_GAP_HALF
-        gap_min_y = HOLE_CENTER_Y - HOLE_GAP_HALF
-        gap_max_y = HOLE_CENTER_Y + HOLE_GAP_HALF
+    def _add_green_boxes(self, body: BulletRigidBodyNode) -> None:
+        """Draws collider boxes on the course, leaving a gap at the hole"""
+        self._add_box(body, GROUND_MIN_X, GROUND_MAX_X, GROUND_MIN_Y, GAP_MIN_Y, GREEN_SURFACE_Z)
+        self._add_box(body, GROUND_MIN_X, GROUND_MAX_X, GAP_MAX_Y, GROUND_MAX_Y, GREEN_SURFACE_Z)
+        self._add_box(body, GROUND_MIN_X, GAP_MIN_X, GAP_MIN_Y, GAP_MAX_Y, GREEN_SURFACE_Z)
+        self._add_box(body, GAP_MAX_X, GROUND_MAX_X, GAP_MIN_Y, GAP_MAX_Y, GREEN_SURFACE_Z)
 
-        self._add_quad(mesh, GROUND_MIN_X, gap_min_x, GROUND_MIN_Y, GROUND_MAX_Y)
-        self._add_quad(mesh, gap_max_x, GROUND_MAX_X, GROUND_MIN_Y, GROUND_MAX_Y)
-        self._add_quad(mesh, gap_min_x, gap_max_x, GROUND_MIN_Y, gap_min_y)
-        self._add_quad(mesh, gap_min_x, gap_max_x, gap_max_y, GROUND_MAX_Y)
+    def _add_cup_bottom(self, body: BulletRigidBodyNode) -> None:
+        """Close the bottom of the cup so the ball is caught and held."""
+        self._add_box(body, GAP_MIN_X, GAP_MAX_X, GAP_MIN_Y, GAP_MAX_Y, GREEN_SURFACE_Z - HOLE_DEPTH)
 
-    def _add_quad(self, mesh: BulletTriangleMesh, x0: float, x1: float, y0: float, y1: float) -> None:
-        """Add one flat quad (two upward-facing triangles) at the green surface."""
-        self._add_face(
-            mesh,
-            Point3(x0, y0, GREEN_SURFACE_Z),
-            Point3(x1, y0, GREEN_SURFACE_Z),
-            Point3(x1, y1, GREEN_SURFACE_Z),
-            Point3(x0, y1, GREEN_SURFACE_Z),
-        )
-
-    def _add_cup(self, mesh: BulletTriangleMesh) -> None:
-        """Build an open-topped box under the gap so the ball drops in and is held."""
-        min_x = HOLE_CENTER_X - HOLE_GAP_HALF
-        max_x = HOLE_CENTER_X + HOLE_GAP_HALF
-        min_y = HOLE_CENTER_Y - HOLE_GAP_HALF
-        max_y = HOLE_CENTER_Y + HOLE_GAP_HALF
-        top_z = GREEN_SURFACE_Z
-        bottom_z = GREEN_SURFACE_Z - HOLE_DEPTH
-
-        bottom_sw = Point3(min_x, min_y, bottom_z)
-        bottom_se = Point3(max_x, min_y, bottom_z)
-        bottom_ne = Point3(max_x, max_y, bottom_z)
-        bottom_nw = Point3(min_x, max_y, bottom_z)
-        top_sw = Point3(min_x, min_y, top_z)
-        top_se = Point3(max_x, min_y, top_z)
-        top_ne = Point3(max_x, max_y, top_z)
-        top_nw = Point3(min_x, max_y, top_z)
-
-        self._add_face(mesh, bottom_sw, bottom_se, bottom_ne, bottom_nw)
-        self._add_face(mesh, bottom_sw, bottom_se, top_se, top_sw)
-        self._add_face(mesh, bottom_nw, bottom_ne, top_ne, top_nw)
-        self._add_face(mesh, bottom_sw, bottom_nw, top_nw, top_sw)
-        self._add_face(mesh, bottom_se, bottom_ne, top_ne, top_se)
-
-    def _add_face(
-        self, mesh: BulletTriangleMesh, corner_a: Point3, corner_b: Point3, corner_c: Point3, corner_d: Point3
+    def _add_box(
+        self, body: BulletRigidBodyNode, min_x: float, max_x: float, min_y: float, max_y: float, top_z: float
     ) -> None:
-        """Add a quad as two triangles, given its four corners in loop order."""
-        mesh.addTriangle(corner_a, corner_b, corner_c)
-        mesh.addTriangle(corner_a, corner_c, corner_d)
+        """Add a box spanning the given footprint, top face at top_z, hanging down by FLOOR_THICKNESS."""
+        half = Vec3((max_x - min_x) / 2, (max_y - min_y) / 2, FLOOR_THICKNESS / 2)
+        center = Point3((min_x + max_x) / 2, (min_y + max_y) / 2, top_z - FLOOR_THICKNESS / 2)
+        body.addShape(BulletBoxShape(half), TransformState.makePos(center))
 
     def _lay_tiles(self) -> NodePath:
         """Tee off, run down a short fairway. Returns the hole tile (the last one)."""
