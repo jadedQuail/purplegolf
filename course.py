@@ -22,6 +22,10 @@ GROUND_MAX_X = TILE_SIZE / 2
 GROUND_MIN_Y = -TILE_SIZE / 2
 GROUND_MAX_Y = LAST_TILE_Y * TILE_SIZE + TILE_SIZE / 2
 
+HOLE_CENTER_X = 0.0
+HOLE_CENTER_Y = LAST_TILE_Y * TILE_SIZE
+HOLE_GAP_HALF = 0.045
+
 TILE_START_ASSET_NAME = "start"
 TILE_STRAIGHT_ASSET_NAME = "straight"
 TILE_HOLE_ROUND_ASSET_NAME = "hole-round"
@@ -55,7 +59,7 @@ class Course:
     def _make_ground(self) -> None:
         """A flat floor the ball rolls on, built as a mesh we can carve later."""
         mesh = BulletTriangleMesh()
-        self._add_floor_triangles(mesh)
+        self._add_floor_quads(mesh)
 
         shape = BulletTriangleMeshShape(mesh, dynamic=False)
         body = BulletRigidBodyNode(GROUND_BODY)
@@ -66,12 +70,24 @@ class Course:
         self.root.attachNewNode(body)
         self.base.physics_world.attachRigidBody(body)
 
-    def _add_floor_triangles(self, mesh: BulletTriangleMesh) -> None:
-        """Lay the green as a single flat quad spanning the course footprint."""
-        corner_a = Point3(GROUND_MIN_X, GROUND_MIN_Y, GREEN_SURFACE_Z)
-        corner_b = Point3(GROUND_MAX_X, GROUND_MIN_Y, GREEN_SURFACE_Z)
-        corner_c = Point3(GROUND_MAX_X, GROUND_MAX_Y, GREEN_SURFACE_Z)
-        corner_d = Point3(GROUND_MIN_X, GROUND_MAX_Y, GREEN_SURFACE_Z)
+    def _add_floor_quads(self, mesh: BulletTriangleMesh) -> None:
+        """Lay the green flat, leaving a square gap at the cup for the ball to drop through."""
+        gap_min_x = HOLE_CENTER_X - HOLE_GAP_HALF
+        gap_max_x = HOLE_CENTER_X + HOLE_GAP_HALF
+        gap_min_y = HOLE_CENTER_Y - HOLE_GAP_HALF
+        gap_max_y = HOLE_CENTER_Y + HOLE_GAP_HALF
+
+        self._add_quad(mesh, GROUND_MIN_X, gap_min_x, GROUND_MIN_Y, GROUND_MAX_Y)
+        self._add_quad(mesh, gap_max_x, GROUND_MAX_X, GROUND_MIN_Y, GROUND_MAX_Y)
+        self._add_quad(mesh, gap_min_x, gap_max_x, GROUND_MIN_Y, gap_min_y)
+        self._add_quad(mesh, gap_min_x, gap_max_x, gap_max_y, GROUND_MAX_Y)
+
+    def _add_quad(self, mesh: BulletTriangleMesh, x0: float, x1: float, y0: float, y1: float) -> None:
+        """Add one flat quad (two upward-facing triangles) at the green surface."""
+        corner_a = Point3(x0, y0, GREEN_SURFACE_Z)
+        corner_b = Point3(x1, y0, GREEN_SURFACE_Z)
+        corner_c = Point3(x1, y1, GREEN_SURFACE_Z)
+        corner_d = Point3(x0, y1, GREEN_SURFACE_Z)
         mesh.addTriangle(corner_a, corner_b, corner_c)
         mesh.addTriangle(corner_a, corner_c, corner_d)
 
