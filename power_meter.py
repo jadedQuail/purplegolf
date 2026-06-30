@@ -49,6 +49,11 @@ class PowerMeter:
         """Freeze the bar wherever it landed."""
         self.base.taskMgr.remove(TASK_NAME)
 
+    def hide(self) -> None:
+        """Stop charging and remove the bar from the screen for good."""
+        self.stop()
+        self.bar.hide()
+
     def fraction(self) -> float:
         """How full the meter is, from 0.0 (empty) to 1.0 (full)."""
         span = RANGE - MIN

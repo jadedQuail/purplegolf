@@ -6,6 +6,7 @@ from ball import Ball
 from club import Club
 from course import Course
 from game_camera import GameCamera
+from message_banner import MessageBanner
 from orbit_camera import OrbitCamera
 from power_meter import PowerMeter
 
@@ -56,6 +57,7 @@ class MinigolfApp(ShowBase):
         self.game_camera = GameCamera(self, self.ball)
         self.position_game_camera()
         self.power_meter = PowerMeter(self)
+        self.message_banner = MessageBanner(self)
 
         # Keys
         self.accept(TOGGLE_CAMERA_KEY, self.toggle_camera)
@@ -93,18 +95,26 @@ class MinigolfApp(ShowBase):
         """Advance the simulation by the time elapsed since the last frame."""
         dt = self.clock.getDt()
         self.physics_world.doPhysics(dt)
-        if self.ball.apply_rolling_resistance(dt):
-            self.set_up_next_shot()
+        is_ball_settled = self.ball.apply_rolling_resistance(dt)
         self.check_for_hole()
+        if is_ball_settled and not self.ball_holed:
+            self.set_up_next_shot()
         return task.cont
 
     def check_for_hole(self):
-        """Announce, once, when the ball settles into the bottom of the cup."""
+        """End the game the moment the ball settles into the bottom of the cup."""
         if self.ball_holed:
             return
         if self.course.is_ball_on_cup_bottom(self.ball.body):
-            self.ball_holed = True
-            print("The ball hit the bottom of the cup!")
+            self.game_over()
+
+    def game_over(self):
+        """The ball is holed: congratulate the player and lock out further play."""
+        self.ball_holed = True
+        self.message_banner.show("You did it!")
+        self.power_meter.hide()
+        self.ignore(SWING_KEY)
+        self.ignore(SWING_RELEASE_EVENT)
 
     def set_up_next_shot(self):
         """Positions camera and club to be ready for next shot."""
