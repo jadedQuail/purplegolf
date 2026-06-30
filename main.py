@@ -52,6 +52,8 @@ class MinigolfApp(ShowBase):
         self.aim_left_held: bool = False
         self.aim_right_held: bool = False
         self.ball_holed: bool = False
+        self.stroke_count: int = 0
+        self.start_time: float = self.clock.getFrameTime()
 
         self.orbit_camera = OrbitCamera(self, self.course.root, enabled=False)
         self.game_camera = GameCamera(self, self.ball)
@@ -111,7 +113,8 @@ class MinigolfApp(ShowBase):
     def game_over(self):
         """The ball is holed: congratulate the player and lock out further play."""
         self.ball_holed = True
-        self.message_banner.show("You did it!")
+        elapsed_seconds = self.clock.getFrameTime() - self.start_time
+        self.message_banner.show_win(self.stroke_count, elapsed_seconds)
         self.power_meter.hide()
         self.ignore(SWING_KEY)
         self.ignore(SWING_RELEASE_EVENT)
@@ -216,6 +219,7 @@ class MinigolfApp(ShowBase):
         # Launch the ball along the current aim, harder the fuller the power bar was
         launch_speed = MAX_PUTT_SPEED * self.power_meter.fraction()
         self.ball.launch(self.compute_aim_direction(), launch_speed)
+        self.stroke_count += 1
 
 
 if __name__ == "__main__":
