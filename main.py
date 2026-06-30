@@ -20,9 +20,9 @@ SWING_KEY = "space"
 SWING_RELEASE_EVENT = f"{SWING_KEY}-up"
 TOGGLE_CAMERA_KEY = "c"
 
-AIM_LEFT_KEY = "arrow_left"
-AIM_RIGHT_KEY = "arrow_right"
-AIM_TURN_SPEED_DEGREES_PER_SEC = 60.0
+AIM_LEFT_KEYS = ("arrow_left", "a")
+AIM_RIGHT_KEYS = ("arrow_right", "d")
+AIM_TURN_SPEED_DEGREES_PER_SEC = 25.0
 AIM_TASK_NAME = "update_aim"
 
 # Scene-graph node names
@@ -61,10 +61,12 @@ class MinigolfApp(ShowBase):
         self.accept(SWING_KEY, self.start_power_charge)
         self.accept(SWING_RELEASE_EVENT, self.swing_club)
 
-        self.accept(AIM_LEFT_KEY, self.set_aim_left, [True])
-        self.accept(f"{AIM_LEFT_KEY}-up", self.set_aim_left, [False])
-        self.accept(AIM_RIGHT_KEY, self.set_aim_right, [True])
-        self.accept(f"{AIM_RIGHT_KEY}-up", self.set_aim_right, [False])
+        for key in AIM_LEFT_KEYS:
+            self.accept(key, self.set_aim_left, [True])
+            self.accept(f"{key}-up", self.set_aim_left, [False])
+        for key in AIM_RIGHT_KEYS:
+            self.accept(key, self.set_aim_right, [True])
+            self.accept(f"{key}-up", self.set_aim_right, [False])
 
         self.taskMgr.add(self.update_aim, AIM_TASK_NAME)
 
@@ -96,6 +98,7 @@ class MinigolfApp(ShowBase):
 
     def set_up_next_shot(self):
         """Positions camera and club to be ready for next shot."""
+        self.aim_offset_degrees = 0.0
         self.aim_club()
         if self.game_camera.active:
             self.position_game_camera()
