@@ -1,5 +1,5 @@
 from direct.showbase.ShowBase import ShowBase
-from panda3d.bullet import BulletDebugNode, BulletWorld
+from panda3d.bullet import BulletWorld
 from panda3d.core import Quat, Vec3
 
 from ball import Ball
@@ -10,6 +10,7 @@ from instructions_panel import InstructionsPanel
 from message_banner import MessageBanner
 from orbit_camera import OrbitCamera
 from power_meter import PowerMeter
+from scene_lighting import SceneLighting
 
 # Physics
 GRAVITY = (0, 0, -9.81)
@@ -27,9 +28,6 @@ AIM_RIGHT_KEYS = ("arrow_right", "d")
 AIM_TURN_SPEED_DEGREES_PER_SEC = 25.0
 AIM_TASK_NAME = "update_aim"
 
-# Scene-graph node names
-PHYSICS_DEBUG_NODE = "physics_debug"
-
 
 class MinigolfApp(ShowBase):
     def __init__(self):
@@ -39,6 +37,8 @@ class MinigolfApp(ShowBase):
         self.disableMouse()
 
         self.setup_physics()
+
+        self.lighting = SceneLighting(self)
 
         self.course = Course(self)
 
@@ -85,18 +85,6 @@ class MinigolfApp(ShowBase):
         self.physics_world = BulletWorld()
         self.physics_world.setGravity(GRAVITY)
         self.taskMgr.add(self.step_physics, PHYSICS_TASK_NAME)
-        self.setup_physics_debug()
-
-    def setup_physics_debug(self):
-        """Draw every collider in the world as wireframe, overlaid on the models."""
-        debug_node = BulletDebugNode(PHYSICS_DEBUG_NODE)
-        debug_node.showWireframe(True)
-
-        debug_nodepath = self.render.attachNewNode(debug_node)
-        debug_nodepath.show()
-
-        self.physics_world.setDebugNode(debug_node)
-        self.physics_debug_nodepath = debug_nodepath
 
     def step_physics(self, task):
         """Advance the simulation by the time elapsed since the last frame."""
