@@ -6,6 +6,7 @@ from ball import Ball
 from club import Club
 from course import Course
 from game_camera import GameCamera
+from instructions_panel import InstructionsPanel
 from message_banner import MessageBanner
 from orbit_camera import OrbitCamera
 from power_meter import PowerMeter
@@ -61,6 +62,7 @@ class MinigolfApp(ShowBase):
         self.power_meter = PowerMeter(self)
         self.message_banner = MessageBanner(self)
         self.message_banner.set_restart_command(self.restart_hole)
+        self.instructions_panel = InstructionsPanel(self)
 
         self.bind_controls()
         self.taskMgr.add(self.update_aim, AIM_TASK_NAME)
